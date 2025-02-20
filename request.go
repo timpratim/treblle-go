@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -28,8 +26,7 @@ type RequestInfo struct {
 var ErrNotJson = errors.New("request body is not JSON")
 
 // Get details about the request
-func getRequestInfo(r *http.Request, startTime time.Time) (RequestInfo, error) {
-	defer dontPanic()
+func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorProvider) (RequestInfo, error) {
 
 	headers := make(map[string]string)
 	for k := range r.Header {
@@ -67,6 +64,7 @@ func getRequestInfo(r *http.Request, startTime time.Time) (RequestInfo, error) {
 	if len(queryParams) > 0 {
 		sanitizedQuery, err := json.Marshal(maskData(queryParams))
 		if err != nil {
+			errorProvider.AddError(err, RequestError, "query_masking")
 			return ri, err
 		}
 		ri.Query = json.RawMessage(sanitizedQuery)
@@ -78,15 +76,17 @@ func getRequestInfo(r *http.Request, startTime time.Time) (RequestInfo, error) {
 	}
 
 	if r.Body != nil && r.Body != http.NoBody {
-		buf, err := ioutil.ReadAll(r.Body)
+		buf, err := io.ReadAll(r.Body)
 		if err != nil {
+			errorProvider.AddError(err, RequestError, "body_reading")
 			return ri, err
 		}
-		bodyReaderOriginal := ioutil.NopCloser(bytes.NewBuffer(buf))
-		defer recoverBody(r, ioutil.NopCloser(bytes.NewBuffer(buf)))
+		bodyReaderOriginal := io.NopCloser(bytes.NewBuffer(buf))
+		defer recoverBody(r, io.NopCloser(bytes.NewBuffer(buf)))
 
-		body, err := ioutil.ReadAll(bodyReaderOriginal)
+		body, err := io.ReadAll(bodyReaderOriginal)
 		if err != nil {
+			errorProvider.AddError(err, RequestError, "body_reading")
 			return ri, err
 		}
 
@@ -96,8 +96,8 @@ func getRequestInfo(r *http.Request, startTime time.Time) (RequestInfo, error) {
 			if errors.Is(err, ErrNotJson) {
 				return ri, ErrNotJson
 			}
-			// For other errors, continue without the body
-			log.Printf("Error masking JSON body: %v", err)
+			// For other errors, add to error provider but continue
+			errorProvider.AddError(err, RequestError, "body_masking")
 			return ri, nil
 		}
 

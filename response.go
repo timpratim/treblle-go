@@ -17,17 +17,10 @@ type ResponseInfo struct {
 	Errors   []ErrorInfo     `json:"errors"`
 }
 
-type ErrorInfo struct {
-	Source  string `json:"source"`
-	Type    string `json:"type"`
-	Message string `json:"message"`
-	File    string `json:"file"`
-	Line    int    `json:"line"`
-}
+
 
 // Extract information from the response recorder
-func getResponseInfo(response *httptest.ResponseRecorder, startTime time.Time) ResponseInfo {
-	defer dontPanic()
+func getResponseInfo(response *httptest.ResponseRecorder, startTime time.Time, errorProvider *ErrorProvider) ResponseInfo {
 
 	re := ResponseInfo{
 		Code:     response.Code,
@@ -46,21 +39,18 @@ func getResponseInfo(response *httptest.ResponseRecorder, startTime time.Time) R
 				// Create a JSON-encoded string without extra quotes
 				jsonBytes, err := json.Marshal(string(bodyBytes))
 				if err != nil {
-					re.Errors = append(re.Errors, ErrorInfo{
-						Source:  "response",
-						Type:    "body_encoding_error",
-						Message: err.Error(),
-					})
+					errorProvider.AddError(err, ResponseError, "body_encoding")
+				} else {
+					re.Body = json.RawMessage(jsonBytes)
 				}
-				re.Body = json.RawMessage(jsonBytes)
 			} else {
-				re.Errors = append(re.Errors, ErrorInfo{
-					Source:  "response",
-					Type:    "body_masking_error",
-					Message: err.Error(),
-				})
-				jsonBytes, _ := json.Marshal(string(bodyBytes))
-				re.Body = json.RawMessage(jsonBytes)
+				errorProvider.AddCustomError(err.Error(), ResponseError, "body_masking")
+				jsonBytes, err := json.Marshal(string(bodyBytes))
+				if err != nil {
+					errorProvider.AddError(err, ResponseError, "body_encoding")
+				} else {
+					re.Body = json.RawMessage(jsonBytes)
+				}
 			}
 		} else {
 			re.Body = sanitizedBody
@@ -98,7 +88,11 @@ func getResponseInfo(response *httptest.ResponseRecorder, startTime time.Time) R
 		}
 	}
 
-	headersJson, _ := json.Marshal(headers)
+	headersJson, err := json.Marshal(headers)
+	if err != nil {
+		errorProvider.AddError(err, ResponseError, "header_encoding")
+		return re
+	}
 	re.Headers = json.RawMessage(headersJson)
 
 	return re

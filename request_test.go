@@ -142,7 +142,8 @@ func (s *TestSuite) TestResponseHeaderMasking() {
 			}
 		}
 
-		resp := getResponseInfo(rec, time.Now())
+		errorProvider := NewErrorProvider()
+		resp := getResponseInfo(rec, time.Now(), errorProvider)
 		var headers map[string]interface{}
 		err := json.Unmarshal(resp.Headers, &headers)
 		s.Require().NoError(err, tn)
