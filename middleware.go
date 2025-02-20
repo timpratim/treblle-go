@@ -2,36 +2,56 @@ package treblle
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"time"
 )
 
 const (
-	treblleVersion = "0.7.2"
+	treblleVersion = "0.8.0"
 	sdkName        = "go"
 )
 
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Create error provider for this request
+		errorProvider := NewErrorProvider()
+		defer errorProvider.Clear()
+
+		// Recover from panics
+		defer func() {
+			if err := recover(); err != nil {
+				errorProvider.AddCustomError(
+					fmt.Sprintf("panic recovered: %v", err),
+					UnhandledExceptionError,
+					"middleware",
+				)
+			}
+		}()
+
 		startTime := time.Now()
 
 		// Get request info before processing
-		requestInfo, errReqInfo := getRequestInfo(r, startTime)
+		requestInfo, errReqInfo := getRequestInfo(r, startTime, errorProvider)
+		if errReqInfo != nil && !errors.Is(errReqInfo, ErrNotJson) {
+			errorProvider.AddError(errReqInfo, RequestError, "request_processing")
+		}
 
-		// intercept the response so it can be copied
+		// Intercept the response so it can be copied
 		rec := httptest.NewRecorder()
 		next.ServeHTTP(rec, r)
 
-		// copy everything from response recorder to response writer
+		// Copy everything from response recorder to response writer
 		for k, v := range rec.Header() {
 			w.Header()[k] = v
 		}
 		w.WriteHeader(rec.Code)
+
+		// Write response body
 		_, err := w.Write(rec.Body.Bytes())
 		if err != nil {
-			log.Printf("Error writing response: %v", err)
+			errorProvider.AddError(err, ResponseError, "response_writing")
 			return
 		}
 
@@ -40,17 +60,12 @@ func Middleware(next http.Handler) http.Handler {
 		// OR
 		// 2. The response is JSON (regardless of status code)
 		if !errors.Is(errReqInfo, ErrNotJson) || rec.Header().Get("Content-Type") == "application/json" {
-			responseInfo := getResponseInfo(rec, startTime)
+			responseInfo := getResponseInfo(rec, startTime, errorProvider)
 
-			// If there was an error with the request, add it to the response errors
-			if errReqInfo != nil && !errors.Is(errReqInfo, ErrNotJson) {
-				responseInfo.Errors = append(responseInfo.Errors, ErrorInfo{
-					Source:  "request",
-					Type:    "REQUEST_ERROR",
-					Message: errReqInfo.Error(),
-				})
-			}
+			// Add all collected errors to the response
+			responseInfo.Errors = errorProvider.GetErrors()
 
+			// Create metadata
 			ti := MetaData{
 				ApiKey:    Config.APIKey,
 				ProjectID: Config.ProjectID,
@@ -63,15 +78,16 @@ func Middleware(next http.Handler) http.Handler {
 					Response: responseInfo,
 				},
 			}
-			// don't block execution while sending data to Treblle
-			go sendToTreblle(ti)
+
+			// Don't block execution while sending data to Treblle
+			go func() {
+				defer func() {
+					if err := recover(); err != nil {
+						// Silently recover from panic
+					}
+				}()
+				sendToTreblle(ti)
+			}()
 		}
 	})
-}
-
-// If anything happens to go wrong inside one of treblle-go internals, recover from panic and continue
-func dontPanic() {
-	if err := recover(); err != nil {
-		log.Printf("treblle-go panic: %s", err)
-	}
 }

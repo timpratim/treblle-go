@@ -1,7 +1,6 @@
 package treblle
 
 import (
-	"log"
 	"os"
 	"strings"
 )
@@ -41,8 +40,11 @@ func Configure(config Configuration) {
 	}
 	if config.Endpoint != "" {
 		Config.Endpoint = config.Endpoint
-		log.Printf("Setting Treblle endpoint to: %s", config.Endpoint)
 	}
+
+	// Initialize server and language info
+	Config.serverInfo = GetServerInfo()
+	Config.languageInfo = GetLanguageInfo()
 
 	// Initialize default masking settings
 	Config.MaskingEnabled = true // Enable by default
