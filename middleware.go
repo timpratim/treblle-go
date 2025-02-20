@@ -17,30 +17,40 @@ func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startTime := time.Now()
 
+		// Get request info before processing
 		requestInfo, errReqInfo := getRequestInfo(r, startTime)
 
 		// intercept the response so it can be copied
 		rec := httptest.NewRecorder()
-
-		// do the actual request as intended
 		next.ServeHTTP(rec, r)
-		// after this finishes, we have the response recorded
 
-		// copy the original headers
+		// copy everything from response recorder to response writer
 		for k, v := range rec.Header() {
 			w.Header()[k] = v
 		}
-
-		// copy the original code
 		w.WriteHeader(rec.Code)
-
-		// write the original body
 		_, err := w.Write(rec.Body.Bytes())
 		if err != nil {
+			log.Printf("Error writing response: %v", err)
 			return
 		}
 
-		if !errors.Is(errReqInfo, ErrNotJson) {
+		// Send to Treblle if:
+		// 1. The request was valid JSON (or had no body)
+		// OR
+		// 2. The response is JSON (regardless of status code)
+		if !errors.Is(errReqInfo, ErrNotJson) || rec.Header().Get("Content-Type") == "application/json" {
+			responseInfo := getResponseInfo(rec, startTime)
+
+			// If there was an error with the request, add it to the response errors
+			if errReqInfo != nil && !errors.Is(errReqInfo, ErrNotJson) {
+				responseInfo.Errors = append(responseInfo.Errors, ErrorInfo{
+					Source:  "request",
+					Type:    "REQUEST_ERROR",
+					Message: errReqInfo.Error(),
+				})
+			}
+
 			ti := MetaData{
 				ApiKey:    Config.APIKey,
 				ProjectID: Config.ProjectID,
@@ -50,7 +60,7 @@ func Middleware(next http.Handler) http.Handler {
 					Server:   Config.serverInfo,
 					Language: Config.languageInfo,
 					Request:  requestInfo,
-					Response: getResponseInfo(rec, startTime),
+					Response: responseInfo,
 				},
 			}
 			// don't block execution while sending data to Treblle
