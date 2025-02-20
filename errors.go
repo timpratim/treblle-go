@@ -1,7 +1,7 @@
 package treblle
 
 import (
-	"fmt"
+	"errors"
 	"runtime"
 	"sync"
 	"time"
@@ -105,7 +105,7 @@ func (ep *ErrorProvider) AddError(err error, errType ErrorType, source string) {
 
 // AddCustomError adds a custom error with provided details
 func (ep *ErrorProvider) AddCustomError(message string, errType ErrorType, source string) {
-	ep.AddError(fmt.Errorf(message), errType, source)
+	ep.AddError(errors.New(message), errType, source)
 }
 
 // AddErrorWithContext adds an error with additional context

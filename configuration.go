@@ -62,6 +62,10 @@ func Configure(config Configuration) {
 	}
 
 	Config.FieldsMap = generateFieldsToMask(Config.DefaultFieldsToMask, Config.AdditionalFieldsToMask)
+
+	// Initialize server and language info
+	Config.serverInfo = GetServerInfo()
+	Config.languageInfo = GetLanguageInfo()
 }
 
 // getEnvMaskedFields reads masked fields from environment variable

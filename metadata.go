@@ -1,7 +1,12 @@
 package treblle
 
 import (
+	"context"
+	"fmt"
+	"os/exec"
 	"runtime"
+	"strings"
+	"time"
 )
 
 type MetaData struct {
@@ -40,30 +45,65 @@ type LanguageInfo struct {
 }
 
 // Get information about the server environment
-func getServerInfo() ServerInfo {
+func GetServerInfo() ServerInfo {
+	// Get local timezone
+	tz, offset := time.Now().Zone()
+	tzInfo := fmt.Sprintf("%s (UTC%+d)", tz, offset/3600)
+
+	// Get OS version with timeout
+	osVersion := GetOSVersion()
+
 	return ServerInfo{
-		Ip:        "",
-		Timezone:  "UTC",
-		Software:  "",
-		Signature: "",
-		Protocol:  "",
-		Os:        getOsInfo(),
+		Ip:        "", // Will be set by the middleware
+		Timezone:  tzInfo,
+		Software:  runtime.Version(),
+		Signature: "Treblle Go SDK",
+		Protocol:  "HTTP/1.1",
+		Os:        GetOSInfo(osVersion),
 	}
 }
 
-// Get information about the programming language
-func getLanguageInfo() LanguageInfo {
+// GetOSVersion returns the OS version with a timeout
+func GetOSVersion() string {
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Prepare command based on OS
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.CommandContext(ctx, "sw_vers", "-productVersion")
+	case "linux":
+		cmd = exec.CommandContext(ctx, "uname", "-r")
+	case "windows":
+		cmd = exec.CommandContext(ctx, "cmd", "/c", "ver")
+	default:
+		return "unknown"
+	}
+
+	// Run command with timeout
+	out, err := cmd.Output()
+	if err != nil {
+		return "unknown"
+	}
+
+	// Clean and return output
+	return strings.TrimSpace(string(out))
+}
+
+// GetOSInfo returns information about the operating system that is running on the server
+func GetOSInfo(version string) OsInfo {
+	return OsInfo{
+		Name:         runtime.GOOS,
+		Release:      version,
+		Architecture: runtime.GOARCH,
+	}
+}
+
+func GetLanguageInfo() LanguageInfo {
 	return LanguageInfo{
 		Name:    "go",
 		Version: runtime.Version(),
-	}
-}
-
-// Get information about the operating system that is running on the server
-func getOsInfo() OsInfo {
-	return OsInfo{
-		Name:         runtime.GOOS,
-		Release:      "",
-		Architecture: runtime.GOARCH,
 	}
 }

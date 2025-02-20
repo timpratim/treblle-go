@@ -17,8 +17,6 @@ type ResponseInfo struct {
 	Errors   []ErrorInfo     `json:"errors"`
 }
 
-
-
 // Extract information from the response recorder
 func getResponseInfo(response *httptest.ResponseRecorder, startTime time.Time, errorProvider *ErrorProvider) ResponseInfo {
 
@@ -61,7 +59,7 @@ func getResponseInfo(response *httptest.ResponseRecorder, startTime time.Time, e
 	headers := make(map[string]interface{})
 	for k, v := range response.Header() {
 		if len(v) == 1 {
-			if shouldMaskField(k) {
+			if shouldMaskHeader(k) {
 				if strings.ToLower(k) == "authorization" {
 					parts := strings.SplitN(v[0], " ", 2)
 					if len(parts) == 2 {
@@ -76,7 +74,7 @@ func getResponseInfo(response *httptest.ResponseRecorder, startTime time.Time, e
 				headers[k] = v[0]
 			}
 		} else {
-			if shouldMaskField(k) {
+			if shouldMaskHeader(k) {
 				masked := make([]string, len(v))
 				for i := range v {
 					masked[i] = strings.Repeat("*", 9)
@@ -100,17 +98,21 @@ func getResponseInfo(response *httptest.ResponseRecorder, startTime time.Time, e
 
 // Helper function to check if a header should be masked
 func shouldMaskHeader(headerName string) bool {
-	// Convert common header variations to lowercase for consistent matching
-	headerVariations := []string{
-		headerName,
-		"x-" + headerName,
-		"x_" + headerName,
+	// Convert header name to lowercase for consistent matching
+	headerName = strings.ToLower(headerName)
+
+	// Check direct match
+	if _, exists := Config.FieldsMap[headerName]; exists {
+		return true
 	}
 
-	for _, h := range headerVariations {
-		if _, exists := Config.FieldsMap[h]; exists {
+	// Check with common prefixes
+	prefixes := []string{"x-", "x_"}
+	for _, prefix := range prefixes {
+		if _, exists := Config.FieldsMap[prefix+headerName]; exists {
 			return true
 		}
 	}
+
 	return false
 }
