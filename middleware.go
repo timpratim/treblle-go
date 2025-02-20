@@ -3,7 +3,6 @@ package treblle
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -53,7 +52,6 @@ func Middleware(next http.Handler) http.Handler {
 		_, err := w.Write(rec.Body.Bytes())
 		if err != nil {
 			errorProvider.AddError(err, ResponseError, "response_writing")
-			log.Printf("Error writing response: %v", err)
 			return
 		}
 
@@ -85,7 +83,7 @@ func Middleware(next http.Handler) http.Handler {
 			go func() {
 				defer func() {
 					if err := recover(); err != nil {
-						log.Printf("Error sending to Treblle: %v", err)
+						// Silently recover from panic
 					}
 				}()
 				sendToTreblle(ti)

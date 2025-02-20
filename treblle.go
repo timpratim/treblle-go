@@ -3,7 +3,6 @@ package treblle
 import (
 	"bytes"
 	"encoding/json"
-	"log"
 	"math/rand"
 	"net/http"
 	"time"
@@ -43,17 +42,14 @@ func getTreblleBaseUrl() string {
 
 func sendToTreblle(treblleInfo MetaData) {
 	baseUrl := getTreblleBaseUrl()
-	log.Printf("Sending data to Treblle at: %s", baseUrl)
 
 	bytesRepresentation, err := json.Marshal(treblleInfo)
 	if err != nil {
-		log.Printf("Error marshaling Treblle data: %v", err)
 		return
 	}
 
 	req, err := http.NewRequest(http.MethodPost, baseUrl, bytes.NewBuffer(bytesRepresentation))
 	if err != nil {
-		log.Printf("Error creating Treblle request: %v", err)
 		return
 	}
 	// Set the content type from the writer, it includes necessary boundary as well
@@ -65,9 +61,7 @@ func sendToTreblle(treblleInfo MetaData) {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("Error sending data to Treblle: %v", err)
 		return
 	}
 	defer resp.Body.Close()
-	log.Printf("Treblle response status: %d", resp.StatusCode)
 }
