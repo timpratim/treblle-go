@@ -47,14 +47,14 @@ type LanguageInfo struct {
 // Get information about the server environment
 func GetServerInfo() ServerInfo {
 	// Get local timezone
-	tz, offset := time.Now().Zone()
-	tzInfo := fmt.Sprintf("%s (UTC%+d)", tz, offset/3600)
+	_, offset := time.Now().Zone()
+	tzInfo := fmt.Sprintf("UTC%+d", offset/3600) // Simplified timezone format like the old SDK
 
 	// Get OS version with timeout
 	osVersion := GetOSVersion()
 
 	return ServerInfo{
-		Ip:        "", // Will be set by the middleware
+		Ip:        "127.0.0.1", // Default to localhost, will be updated with actual IP in middleware
 		Timezone:  tzInfo,
 		Software:  runtime.Version(),
 		Signature: "Treblle Go SDK",

@@ -44,6 +44,10 @@ func Configure(config Configuration) {
 		log.Printf("Setting Treblle endpoint to: %s", config.Endpoint)
 	}
 
+	// Initialize server and language info
+	Config.serverInfo = GetServerInfo()
+	Config.languageInfo = GetLanguageInfo()
+
 	// Initialize default masking settings
 	Config.MaskingEnabled = true // Enable by default
 	if len(config.DefaultFieldsToMask) > 0 {
@@ -62,10 +66,6 @@ func Configure(config Configuration) {
 	}
 
 	Config.FieldsMap = generateFieldsToMask(Config.DefaultFieldsToMask, Config.AdditionalFieldsToMask)
-
-	// Initialize server and language info
-	Config.serverInfo = GetServerInfo()
-	Config.languageInfo = GetLanguageInfo()
 }
 
 // getEnvMaskedFields reads masked fields from environment variable
