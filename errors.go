@@ -100,7 +100,12 @@ func (ep *ErrorProvider) AddError(err error, errType ErrorType, source string) {
 		errorInfo.Context = ec.Context
 	}
 
-	ep.errors = append(ep.errors, errorInfo)
+	// Add to batch collector if enabled, otherwise add to regular errors slice
+	if Config.batchErrorCollector != nil {
+		Config.batchErrorCollector.Add(errorInfo)
+	} else {
+		ep.errors = append(ep.errors, errorInfo)
+	}
 }
 
 // AddCustomError adds a custom error with provided details

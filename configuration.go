@@ -3,6 +3,7 @@ package treblle
 import (
 	"os"
 	"strings"
+	"time"
 )
 
 var Config internalConfiguration
@@ -15,6 +16,9 @@ type Configuration struct {
 	DefaultFieldsToMask    []string
 	MaskingEnabled         bool
 	Endpoint               string // Custom endpoint for testing
+	BatchErrorEnabled      bool   // Enable batch error collection
+	BatchErrorSize         int    // Size of error batch before sending
+	BatchFlushInterval     time.Duration // Interval to flush errors if batch size not reached
 }
 
 // internalConfiguration is used for communication with Treblle API and contains optimizations
@@ -29,6 +33,7 @@ type internalConfiguration struct {
 	serverInfo             ServerInfo
 	languageInfo           LanguageInfo
 	Debug                  bool
+	batchErrorCollector    *BatchErrorCollector
 }
 
 func Configure(config Configuration) {
@@ -48,6 +53,16 @@ func Configure(config Configuration) {
 
 	// Initialize default masking settings
 	Config.MaskingEnabled = true // Enable by default
+
+	// Initialize batch error collector if enabled
+	if config.BatchErrorEnabled {
+		// Close existing collector if any
+		if Config.batchErrorCollector != nil {
+			Config.batchErrorCollector.Close()
+		}
+		// Create new batch error collector
+		Config.batchErrorCollector = NewBatchErrorCollector(config.BatchErrorSize, config.BatchFlushInterval)
+	}
 	if len(config.DefaultFieldsToMask) > 0 {
 		Config.DefaultFieldsToMask = config.DefaultFieldsToMask
 	} else {

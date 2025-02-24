@@ -22,6 +22,7 @@ type DataInfo struct {
 	Language LanguageInfo `json:"language"`
 	Request  RequestInfo  `json:"request"`
 	Response ResponseInfo `json:"response"`
+	Errors   []ErrorInfo  `json:"errors,omitempty"`
 }
 
 type ServerInfo struct {
