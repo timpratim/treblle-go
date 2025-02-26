@@ -24,6 +24,7 @@ type Configuration struct {
 	AsyncProcessingEnabled bool   // Enable asynchronous request processing
 	MaxConcurrentProcessing int   // Maximum number of concurrent async operations (default: 10)
 	AsyncShutdownTimeout   time.Duration // Timeout for async shutdown (default: 5s)
+	IgnoredEnvironments    []string // Environments where Treblle does not track requests
 }
 
 // internalConfiguration is used for communication with Treblle API and contains optimizations
@@ -44,6 +45,7 @@ type internalConfiguration struct {
 	AsyncProcessingEnabled bool
 	MaxConcurrentProcessing int
 	AsyncShutdownTimeout   time.Duration
+	IgnoredEnvironments    []string // Environments where Treblle does not track requests
 }
 
 func Configure(config Configuration) {
@@ -99,19 +101,29 @@ func Configure(config Configuration) {
 		// Create new batch error collector
 		Config.batchErrorCollector = NewBatchErrorCollector(config.BatchErrorSize, config.BatchFlushInterval)
 	}
-	if len(config.DefaultFieldsToMask) > 0 {
-		Config.DefaultFieldsToMask = config.DefaultFieldsToMask
+
+	// Load default fields to mask if not specified
+	if len(config.DefaultFieldsToMask) == 0 {
+		Config.DefaultFieldsToMask = getDefaultFieldsToMask()
 	} else {
-		// Load from environment variable if available
-		if envFields := getEnvMaskedFields(); len(envFields) > 0 {
-			Config.DefaultFieldsToMask = envFields
-		} else {
-			Config.DefaultFieldsToMask = getDefaultFieldsToMask()
-		}
+		Config.DefaultFieldsToMask = config.DefaultFieldsToMask
 	}
 
-	if len(config.AdditionalFieldsToMask) > 0 {
+	// Check for additional fields to mask from environment variables
+	envMaskedFields := getEnvMaskedFields()
+	if len(envMaskedFields) > 0 {
+		Config.AdditionalFieldsToMask = append(Config.AdditionalFieldsToMask, envMaskedFields...)
+	} else if len(config.AdditionalFieldsToMask) > 0 {
 		Config.AdditionalFieldsToMask = config.AdditionalFieldsToMask
+	}
+
+	// Load ignored environments from config or environment variable
+	if len(config.IgnoredEnvironments) > 0 {
+		Config.IgnoredEnvironments = config.IgnoredEnvironments
+	} else {
+		// Default ignored environments: dev, test, testing
+		defaultIgnoredEnvs := []string{"dev", "test", "testing"}
+		Config.IgnoredEnvironments = getEnvAsSlice("TREBLLE_IGNORED_ENV", defaultIgnoredEnvs)
 	}
 
 	Config.FieldsMap = generateFieldsToMask(Config.DefaultFieldsToMask, Config.AdditionalFieldsToMask)
@@ -178,4 +190,43 @@ func GetSDKInfo() map[string]string {
 		"SDK Name":    Config.SDKName,
 		"SDK Version": Config.SDKVersion,
 	}
+}
+
+// getEnvAsSlice reads a comma-separated environment variable and returns it as a slice
+// If the environment variable is not set, it returns the default values
+func getEnvAsSlice(envKey string, defaultValues []string) []string {
+	if value := os.Getenv(envKey); value != "" {
+		return strings.Split(value, ",")
+	}
+	return defaultValues
+}
+
+// IsEnvironmentIgnored checks if the current environment should be ignored
+func IsEnvironmentIgnored() bool {
+	// Get the current environment
+	currentEnv := os.Getenv("GO_ENV") // Default Go environment variable
+	if currentEnv == "" {
+		// Try alternative environment variables if GO_ENV is not set
+		currentEnv = os.Getenv("ENV")
+		if currentEnv == "" {
+			currentEnv = os.Getenv("ENVIRONMENT")
+			if currentEnv == "" {
+				currentEnv = os.Getenv("APP_ENV")
+			}
+		}
+	}
+
+	// If no environment is set, don't ignore
+	if currentEnv == "" {
+		return false
+	}
+
+	// Check if the environment is in the ignored list
+	for _, ignoredEnv := range Config.IgnoredEnvironments {
+		if strings.TrimSpace(currentEnv) == strings.TrimSpace(ignoredEnv) {
+			return true
+		}
+	}
+
+	return false
 }
