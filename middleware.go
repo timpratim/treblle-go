@@ -77,7 +77,7 @@ func Middleware(next http.Handler) http.Handler {
 		// 2. The response is JSON (regardless of status code)
 		if !errors.Is(errReqInfo, ErrNotJson) || rec.Header().Get("Content-Type") == "application/json" {
 			responseInfo := getResponseInfo(rec, startTime, errorProvider)
-
+			
 			// Add all collected errors to the response
 			responseInfo.Errors = errorProvider.GetErrors()
 
