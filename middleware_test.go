@@ -253,3 +253,60 @@ func (s *TestSuite) TestMiddleware() {
 		s.TearDownTest()
 	}
 }
+
+func (s *TestSuite) TestProtocolDetection() {
+	s.SetupTest()
+	
+	// Create a channel to receive the detected protocol
+	protocolChan := make(chan string, 1)
+	
+	// Setup the mock Treblle server to capture the protocol
+	mockURL := s.treblleMockServer.URL
+	
+	Configure(Configuration{
+		APIKey:              "test-api-key",
+		ProjectID:           "test-project-id",
+		DefaultFieldsToMask: []string{"password"},
+		Endpoint:            mockURL,
+	})
+	
+	s.treblleMockMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		var treblleMetadata MetaData
+		decoder := json.NewDecoder(r.Body)
+		err := decoder.Decode(&treblleMetadata)
+		if err != nil {
+			s.Fail("Failed to decode Treblle metadata", err)
+			return
+		}
+		
+		// Send the detected protocol to the channel
+		protocolChan <- treblleMetadata.Data.Server.Protocol
+		
+		w.WriteHeader(http.StatusOK)
+	})
+	
+	s.router.Use(Middleware)
+	s.router.Get("/test-protocol", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+	
+	// Make a request to the test server with a valid JSON body
+	resp, _ := s.testRequest(http.MethodGet, "/test-protocol", `{"test":"data"}`, map[string]string{
+		"Content-Type": "application/json",
+	})
+	
+	s.Require().Equal(http.StatusOK, resp.StatusCode)
+	
+	// Wait for the async Treblle call to finish and capture the protocol
+	select {
+	case protocol := <-protocolChan:
+		// HTTP/1.1 is expected in test environment
+		s.Require().Equal("HTTP/1.1", protocol, "Protocol detection failed")
+	case <-time.After(2 * time.Second):
+		s.Fail("Timeout waiting for Treblle metadata")
+	}
+	
+	s.TearDownTest()
+}

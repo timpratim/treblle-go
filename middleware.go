@@ -50,6 +50,10 @@ func Middleware(next http.Handler) http.Handler {
 			r = tracker.StoreRequestInfo(r, requestInfo)
 		}
 
+		// Create a copy of the serverInfo with the correct protocol for this request
+		serverInfo := Config.serverInfo
+		serverInfo.Protocol = DetectProtocol(r)
+
 		// Intercept the response so it can be copied
 		rec := httptest.NewRecorder()
 		next.ServeHTTP(rec, r)
@@ -88,7 +92,7 @@ func Middleware(next http.Handler) http.Handler {
 					Version:   Config.SDKVersion,
 					Sdk:       Config.SDKName,
 					Data: DataInfo{
-						Server:   Config.serverInfo,
+						Server:   serverInfo, // Use the updated serverInfo with correct protocol
 						Language: Config.languageInfo,
 						Request:  requestInfo,
 						Response: responseInfo,
@@ -99,8 +103,8 @@ func Middleware(next http.Handler) http.Handler {
 				go func(ti MetaData) {
 					defer func() {
 						if err := recover(); err != nil {
-							// Silently recover from panic
-						}
+						// Silently recover from panic
+					}
 					}()
 					sendToTreblle(ti)
 				}(ti)
