@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	treblleVersion = "0.8.0"
-	sdkName        = "go"
+	treblleVersion = SDKVersion // Use centralized version
+	sdkName        = SDKName    // Use centralized name
 )
 
 func Middleware(next http.Handler) http.Handler {

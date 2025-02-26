@@ -19,6 +19,8 @@ type Configuration struct {
 	BatchErrorEnabled      bool   // Enable batch error collection
 	BatchErrorSize         int    // Size of error batch before sending
 	BatchFlushInterval     time.Duration // Interval to flush errors if batch size not reached
+	SDKName                string // Defaults to "go"
+	SDKVersion             string // Defaults to "1.0.0"
 }
 
 // internalConfiguration is used for communication with Treblle API and contains optimizations
@@ -34,6 +36,8 @@ type internalConfiguration struct {
 	languageInfo           LanguageInfo
 	Debug                  bool
 	batchErrorCollector    *BatchErrorCollector
+	SDKName                string
+	SDKVersion             string
 }
 
 func Configure(config Configuration) {
@@ -53,6 +57,20 @@ func Configure(config Configuration) {
 
 	// Initialize default masking settings
 	Config.MaskingEnabled = true // Enable by default
+
+	// Set SDK Name and Version (Can be overridden via ENV)
+	sdkName := SDKName
+	if config.SDKName != "" {
+		sdkName = config.SDKName
+	}
+	
+	sdkVersion := SDKVersion
+	if config.SDKVersion != "" {
+		sdkVersion = config.SDKVersion
+	}
+	
+	Config.SDKName = getEnvOrDefault("TREBLLE_SDK_NAME", sdkName)
+	Config.SDKVersion = getEnvOrDefault("TREBLLE_SDK_VERSION", sdkVersion)
 
 	// Initialize batch error collector if enabled
 	if config.BatchErrorEnabled {
@@ -126,4 +144,20 @@ func generateFieldsToMask(defaultFields, additionalFields []string) map[string]b
 func shouldMaskField(field string) bool {
 	_, exists := Config.FieldsMap[strings.ToLower(field)]
 	return exists
+}
+
+// Utility function to get env variable or return default
+func getEnvOrDefault(envKey, defaultValue string) string {
+	if value := os.Getenv(envKey); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+// GetSDKInfo returns SDK name and version (for debugging)
+func GetSDKInfo() map[string]string {
+	return map[string]string{
+		"SDK Name":    Config.SDKName,
+		"SDK Version": Config.SDKVersion,
+	}
 }
