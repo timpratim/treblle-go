@@ -10,6 +10,13 @@ import (
 
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if the current environment is in the ignored list
+		if IsEnvironmentIgnored() {
+			// Skip Treblle logging for ignored environments
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// Create error provider for this request
 		errorProvider := NewErrorProvider()
 		defer errorProvider.Clear()
