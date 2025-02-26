@@ -101,6 +101,33 @@ mux := http.NewServeMux()
 mux.Handle("/", treblle.Middleware(http.HandlerFunc(yourHandler)))
 ```
 
+## Asynchronous Processing
+
+Treblle Go SDK supports asynchronous request processing, similar to Laravel's Octane support. This allows Treblle to process API requests without blocking the main request-response cycle, improving performance.
+
+To enable asynchronous processing:
+
+```go
+treblle.Configure(treblle.Configuration{
+    APIKey:                 "YOUR API KEY HERE",
+    ProjectID:              "YOUR PROJECT ID HERE",
+    AsyncProcessingEnabled: true,                  // Enable async processing
+    MaxConcurrentProcessing: 10,                   // Optional: Limit concurrent operations (default: 10)
+    AsyncShutdownTimeout:   5 * time.Second,       // Optional: Timeout for shutdown (default: 5s)
+})
+```
+
+When your application is shutting down, call `GracefulShutdown()` to ensure all pending Treblle data is sent:
+
+```go
+// In your application shutdown code
+treblle.GracefulShutdown()
+```
+
+See the [async example](./examples/async) for a complete implementation.
+
+## Advanced Options
+
 ## gorilla/mux
 
 To setup the `treblle.Middleware` in `gorilla/mux`, you can use it as a global middleware:

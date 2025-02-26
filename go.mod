@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/go-chi/chi v1.5.5
 	github.com/stretchr/testify v1.8.4
+	golang.org/x/sync v0.11.0
 )
 
 require (
