@@ -2,6 +2,7 @@ package treblle
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"math/rand"
 	"net/http"
@@ -41,6 +42,15 @@ func getTreblleBaseUrl() string {
 }
 
 func sendToTreblle(treblleInfo MetaData) {
+	// Use the context-aware version with a default timeout
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutDuration)
+	defer cancel()
+	
+	sendToTreblleWithContext(ctx, treblleInfo)
+}
+
+// sendToTreblleWithContext sends data to Treblle with context support
+func sendToTreblleWithContext(ctx context.Context, treblleInfo MetaData) {
 	baseUrl := getTreblleBaseUrl()
 
 	bytesRepresentation, err := json.Marshal(treblleInfo)
@@ -48,7 +58,7 @@ func sendToTreblle(treblleInfo MetaData) {
 		return
 	}
 
-	req, err := http.NewRequest(http.MethodPost, baseUrl, bytes.NewBuffer(bytesRepresentation))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseUrl, bytes.NewBuffer(bytesRepresentation))
 	if err != nil {
 		return
 	}
@@ -57,7 +67,7 @@ func sendToTreblle(treblleInfo MetaData) {
 	req.Header.Set("x-api-key", Config.APIKey)
 
 	client := &http.Client{
-		Timeout: timeoutDuration,
+		// No need for timeout here as we're using context timeout
 	}
 	resp, err := client.Do(req)
 	if err != nil {

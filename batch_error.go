@@ -12,6 +12,7 @@ type BatchErrorCollector struct {
 	batchSize     int
 	flushInterval time.Duration
 	done          chan struct{}
+	wg            sync.WaitGroup
 }
 
 // NewBatchErrorCollector creates a new BatchErrorCollector with specified batch size and flush interval
@@ -59,13 +60,15 @@ func (b *BatchErrorCollector) flush() {
 	b.errors = b.errors[:0]
 
 	// Send errors asynchronously
+	b.wg.Add(1)
 	go func(errors []ErrorInfo) {
+		defer b.wg.Done()
 		// Create metadata for batch transmission
 		meta := MetaData{
 			ApiKey:    Config.APIKey,
 			ProjectID: Config.ProjectID,
-			Version:   treblleVersion,
-			Sdk:       sdkName,
+			Version:   Config.SDKVersion,
+			Sdk:       Config.SDKName,
 			Data: DataInfo{
 				Server:   Config.serverInfo,
 				Language: Config.languageInfo,
@@ -109,5 +112,13 @@ func (b *BatchErrorCollector) Close() {
 	default:
 		close(b.done)
 		b.flush()
+		b.wg.Wait()
 	}
+}
+
+// Flush sends any pending errors to Treblle immediately
+func (b *BatchErrorCollector) Flush() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.flush()
 }

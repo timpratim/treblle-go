@@ -8,11 +8,6 @@ import (
 	"time"
 )
 
-const (
-	treblleVersion = SDKVersion // Use centralized version
-	sdkName        = SDKName    // Use centralized name
-)
-
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Create error provider for this request
@@ -30,12 +25,22 @@ func Middleware(next http.Handler) http.Handler {
 			}
 		}()
 
+		// Get the request tracker
+		tracker := GetRequestTracker()
+		
+		// Store start time in request context
 		startTime := time.Now()
+		r = tracker.StoreStartTime(r)
 
 		// Get request info before processing
 		requestInfo, errReqInfo := getRequestInfo(r, startTime, errorProvider)
 		if errReqInfo != nil && !errors.Is(errReqInfo, ErrNotJson) {
 			errorProvider.AddError(errReqInfo, RequestError, "request_processing")
+		}
+
+		// Store request info in context if async processing is enabled
+		if Config.AsyncProcessingEnabled {
+			r = tracker.StoreRequestInfo(r, requestInfo)
 		}
 
 		// Intercept the response so it can be copied
@@ -65,29 +70,34 @@ func Middleware(next http.Handler) http.Handler {
 			// Add all collected errors to the response
 			responseInfo.Errors = errorProvider.GetErrors()
 
-			// Create metadata
-			ti := MetaData{
-				ApiKey:    Config.APIKey,
-				ProjectID: Config.ProjectID,
-				Version:   treblleVersion,
-				Sdk:       sdkName,
-				Data: DataInfo{
-					Server:   Config.serverInfo,
-					Language: Config.languageInfo,
-					Request:  requestInfo,
-					Response: responseInfo,
-				},
-			}
+			if Config.AsyncProcessingEnabled {
+				// Process asynchronously with controlled concurrency
+				GetAsyncProcessor().Process(requestInfo, responseInfo, errorProvider)
+			} else {
+				// Create metadata
+				ti := MetaData{
+					ApiKey:    Config.APIKey,
+					ProjectID: Config.ProjectID,
+					Version:   Config.SDKVersion,
+					Sdk:       Config.SDKName,
+					Data: DataInfo{
+						Server:   Config.serverInfo,
+						Language: Config.languageInfo,
+						Request:  requestInfo,
+						Response: responseInfo,
+					},
+				}
 
-			// Don't block execution while sending data to Treblle
-			go func() {
-				defer func() {
-					if err := recover(); err != nil {
-						// Silently recover from panic
-					}
-				}()
-				sendToTreblle(ti)
-			}()
+				// Don't block execution while sending data to Treblle
+				go func(ti MetaData) {
+					defer func() {
+						if err := recover(); err != nil {
+							// Silently recover from panic
+						}
+					}()
+					sendToTreblle(ti)
+				}(ti)
+			}
 		}
 	})
 }

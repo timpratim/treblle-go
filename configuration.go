@@ -21,6 +21,9 @@ type Configuration struct {
 	BatchFlushInterval     time.Duration // Interval to flush errors if batch size not reached
 	SDKName                string // Defaults to "go"
 	SDKVersion             string // Defaults to "1.0.0"
+	AsyncProcessingEnabled bool   // Enable asynchronous request processing
+	MaxConcurrentProcessing int   // Maximum number of concurrent async operations (default: 10)
+	AsyncShutdownTimeout   time.Duration // Timeout for async shutdown (default: 5s)
 }
 
 // internalConfiguration is used for communication with Treblle API and contains optimizations
@@ -38,6 +41,9 @@ type internalConfiguration struct {
 	batchErrorCollector    *BatchErrorCollector
 	SDKName                string
 	SDKVersion             string
+	AsyncProcessingEnabled bool
+	MaxConcurrentProcessing int
+	AsyncShutdownTimeout   time.Duration
 }
 
 func Configure(config Configuration) {
@@ -71,6 +77,18 @@ func Configure(config Configuration) {
 	
 	Config.SDKName = getEnvOrDefault("TREBLLE_SDK_NAME", sdkName)
 	Config.SDKVersion = getEnvOrDefault("TREBLLE_SDK_VERSION", sdkVersion)
+	
+	// Configure async processing
+	Config.AsyncProcessingEnabled = config.AsyncProcessingEnabled
+	Config.MaxConcurrentProcessing = config.MaxConcurrentProcessing
+	if Config.MaxConcurrentProcessing <= 0 {
+		Config.MaxConcurrentProcessing = 10 // Default to 10 concurrent operations
+	}
+	
+	Config.AsyncShutdownTimeout = config.AsyncShutdownTimeout
+	if Config.AsyncShutdownTimeout <= 0 {
+		Config.AsyncShutdownTimeout = 5 * time.Second // Default to 5 seconds
+	}
 
 	// Initialize batch error collector if enabled
 	if config.BatchErrorEnabled {
