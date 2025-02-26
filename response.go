@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// Define the maximum response size (2MB in bytes)
+const maxResponseSize = 2 * 1024 * 1024
+
 type ResponseInfo struct {
 	Headers  json.RawMessage `json:"headers"`
 	Code     int             `json:"code"`
@@ -29,29 +32,43 @@ func getResponseInfo(response *httptest.ResponseRecorder, startTime time.Time, e
 
 	// Handle response body
 	if bodyBytes := response.Body.Bytes(); len(bodyBytes) > 0 {
-		// Try to mask if it's JSON
-		sanitizedBody, err := getMaskedJSON(bodyBytes)
-		if err != nil {
-			// For non-JSON responses, just store the raw body as a JSON string
-			if errors.Is(err, ErrNotJson) {
-				// Create a JSON-encoded string without extra quotes
-				jsonBytes, err := json.Marshal(string(bodyBytes))
-				if err != nil {
-					errorProvider.AddError(err, ResponseError, "body_encoding")
+		// Check if response body size exceeds 2MB
+		if len(bodyBytes) > maxResponseSize {
+			// Replace with empty JSON object
+			re.Body = json.RawMessage("{}")
+			// Set size to 0 as we're not sending the actual body
+			re.Size = 0
+			// Add an error log for exceeding response size
+			errorProvider.AddCustomError(
+				"JSON response size is over 2MB",
+				ResponseError,
+				"response_size_limit",
+			)
+		} else {
+			// Try to mask if it's JSON
+			sanitizedBody, err := getMaskedJSON(bodyBytes)
+			if err != nil {
+				// For non-JSON responses, just store the raw body as a JSON string
+				if errors.Is(err, ErrNotJson) {
+					// Create a JSON-encoded string without extra quotes
+					jsonBytes, err := json.Marshal(string(bodyBytes))
+					if err != nil {
+						errorProvider.AddError(err, ResponseError, "body_encoding")
+					} else {
+						re.Body = json.RawMessage(jsonBytes)
+					}
 				} else {
-					re.Body = json.RawMessage(jsonBytes)
+					errorProvider.AddCustomError(err.Error(), ResponseError, "body_masking")
+					jsonBytes, err := json.Marshal(string(bodyBytes))
+					if err != nil {
+						errorProvider.AddError(err, ResponseError, "body_encoding")
+					} else {
+						re.Body = json.RawMessage(jsonBytes)
+					}
 				}
 			} else {
-				errorProvider.AddCustomError(err.Error(), ResponseError, "body_masking")
-				jsonBytes, err := json.Marshal(string(bodyBytes))
-				if err != nil {
-					errorProvider.AddError(err, ResponseError, "body_encoding")
-				} else {
-					re.Body = json.RawMessage(jsonBytes)
-				}
+				re.Body = sanitizedBody
 			}
-		} else {
-			re.Body = sanitizedBody
 		}
 	}
 
