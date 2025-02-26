@@ -50,7 +50,17 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 
 	// Create URL without query parameters to avoid duplicating them
 	baseURL := protocol + "://" + r.Host + r.URL.Path
-	ip := extractIP(r.RemoteAddr)
+	
+	// Get client IP - prefer X-Forwarded-For if available
+	var ip string
+	forwardedFor := r.Header.Get("X-Forwarded-For")
+	if forwardedFor != "" {
+		// Use the SelectFirstValidIPv4 function directly on the header value
+		ip = SelectFirstValidIPv4(forwardedFor)
+	} else {
+		// Fall back to RemoteAddr
+		ip = extractIP(r.RemoteAddr)
+	}
 
 	ri := RequestInfo{
 		Timestamp: startTime.Format("2006-01-02 15:04:05"),
@@ -217,15 +227,22 @@ func maskValue(valueToMask string, key string) string {
 }
 
 func extractIP(remoteAddr string) string {
+	var ipAddress string
+	
 	// If RemoteAddr contains both IP and port, split and return the IP
 	if strings.Contains(remoteAddr, ":") {
 		ip, _, err := net.SplitHostPort(remoteAddr)
 		if err == nil {
-			return ip
+			ipAddress = ip
+		} else {
+			ipAddress = remoteAddr
 		}
+	} else {
+		ipAddress = remoteAddr
 	}
-
-	return remoteAddr
+	
+	// Return the first valid IPv4 address
+	return SelectFirstValidIPv4(ipAddress)
 }
 
 // getMaskedQueryString returns a masked query string

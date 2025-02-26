@@ -60,7 +60,7 @@ func Configure(config Configuration) {
 	}
 
 	// Initialize server and language info
-	Config.serverInfo = GetServerInfo()
+	Config.serverInfo = GetServerInfo(nil) // Pass nil as request, protocol will be updated in middleware
 	Config.languageInfo = GetLanguageInfo()
 
 	// Initialize default masking settings
