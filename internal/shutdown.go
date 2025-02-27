@@ -1,9 +1,11 @@
-package treblle
+package internal
 
 import (
 	"encoding/json"
 	"net/http"
 	"time"
+	
+	"github.com/timpratim/treblle-go/models"
 )
 
 // ShutdownOptions contains options for graceful shutdown
@@ -11,19 +13,19 @@ type ShutdownOptions struct {
 	// Additional fields to be masked during shutdown
 	AdditionalFieldsToMask []string
 	// Custom error provider (optional)
-	ErrorProvider *ErrorProvider
+	ErrorProvider *models.ErrorProvider
 }
 
 // Shutdown sends data to Treblle before application shutdown
 // It's similar to the terminate method in the Laravel SDK
 func Shutdown(r *http.Request, w http.ResponseWriter, responseBody []byte, options *ShutdownOptions) {
 	// Create error provider if not provided
-	errorProvider := NewErrorProvider()
+	errorProvider := models.NewErrorProvider()
 	if options != nil && options.ErrorProvider != nil {
 		errorProvider = options.ErrorProvider
 	}
 	
-	var requestInfo RequestInfo
+	var requestInfo models.RequestInfo
 	var startTime time.Time
 	
 	// Try to get request info from context if async processing is enabled
@@ -46,9 +48,9 @@ func Shutdown(r *http.Request, w http.ResponseWriter, responseBody []byte, optio
 		
 		// Get request info
 		var err error
-		requestInfo, err = getRequestInfo(r, startTime, errorProvider)
+		requestInfo, err = models.GetRequestInfo(r, startTime, errorProvider)
 		if err != nil {
-			errorProvider.AddError(err, RequestError, "shutdown_request_processing")
+			errorProvider.AddError(err, models.RequestError, "shutdown_request_processing")
 		}
 	}
 	
@@ -64,16 +66,16 @@ func Shutdown(r *http.Request, w http.ResponseWriter, responseBody []byte, optio
 	
 	headersJson, err := json.Marshal(headers)
 	if err != nil {
-		errorProvider.AddError(err, ResponseError, "header_encoding")
+		errorProvider.AddError(err, models.ResponseError, "header_encoding")
 	}
 	
 	// Create response info
-	responseInfo := ResponseInfo{
+	responseInfo := models.ResponseInfo{
 		Headers:  json.RawMessage(headersJson),
 		Code:     http.StatusOK, // Default to 200 if not available
 		Size:     len(responseBody),
 		LoadTime: float64(time.Since(startTime).Milliseconds()),
-		Errors:   []ErrorInfo{},
+		Errors:   []models.ErrorInfo{},
 	}
 	
 	// If response writer is an http.ResponseWriter that allows status code retrieval
@@ -84,7 +86,7 @@ func Shutdown(r *http.Request, w http.ResponseWriter, responseBody []byte, optio
 	// Process response body if available
 	if len(responseBody) > 0 {
 		// Try to mask if it's JSON
-		sanitizedBody, err := getMaskedJSON(responseBody)
+		sanitizedBody, err := models.GetMaskedJSON(responseBody)
 		if err == nil {
 			responseInfo.Body = sanitizedBody
 		} else {
@@ -100,14 +102,14 @@ func Shutdown(r *http.Request, w http.ResponseWriter, responseBody []byte, optio
 	responseInfo.Errors = errorProvider.GetErrors()
 	
 	// Create metadata
-	ti := MetaData{
-		ApiKey:    Config.APIKey,
+	ti := models.MetaData{
+		ApiKey:    Config.ApiKey,
 		ProjectID: Config.ProjectID,
-		Version:   SDKVersion,
-		Sdk:       SDKName,
-		Data: DataInfo{
-			Server:   Config.serverInfo,
-			Language: Config.languageInfo,
+		Version:   models.SDKVersion,
+		Sdk:       models.SDKName,
+		Data: models.DataInfo{
+			Server:   Config.ServerInfo,
+			Language: Config.LanguageInfo,
 			Request:  requestInfo,
 			Response: responseInfo,
 		},
@@ -119,25 +121,25 @@ func Shutdown(r *http.Request, w http.ResponseWriter, responseBody []byte, optio
 	}
 	
 	// Send data to Treblle synchronously (not in a goroutine since we're shutting down)
-	sendToTreblle(ti)
+	models.SendToTreblle(ti)
 }
 
 // ShutdownWithCustomData sends custom request and response data to Treblle before shutdown
-func ShutdownWithCustomData(requestInfo RequestInfo, responseInfo ResponseInfo, errorProvider *ErrorProvider) {
+func ShutdownWithCustomData(requestInfo models.RequestInfo, responseInfo models.ResponseInfo, errorProvider *models.ErrorProvider) {
 	// Add collected errors to the response if error provider is available
 	if errorProvider != nil {
 		responseInfo.Errors = errorProvider.GetErrors()
 	}
 	
 	// Create metadata
-	ti := MetaData{
-		ApiKey:    Config.APIKey,
+	ti := models.MetaData{
+		ApiKey:    Config.ApiKey,
 		ProjectID: Config.ProjectID,
-		Version:   SDKVersion,
-		Sdk:       SDKName,
-		Data: DataInfo{
-			Server:   Config.serverInfo,
-			Language: Config.languageInfo,
+		Version:   models.SDKVersion,
+		Sdk:       models.SDKName,
+		Data: models.DataInfo{
+			Server:   Config.ServerInfo,
+			Language: Config.LanguageInfo,
 			Request:  requestInfo,
 			Response: responseInfo,
 		},
@@ -149,7 +151,7 @@ func ShutdownWithCustomData(requestInfo RequestInfo, responseInfo ResponseInfo, 
 	}
 	
 	// Send data to Treblle synchronously
-	sendToTreblle(ti)
+	models.SendToTreblle(ti)
 }
 
 // GracefulShutdown flushes any pending batch errors and ensures all data is sent to Treblle

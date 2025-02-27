@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/treblle/treblle-go"
+	"github.com/timpratim/treblle-go/internal"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
 
 	// If `-debug` flag is passed, display debug information
 	if *debug {
-		treblle.DebugCommand()
+		internal.DebugCommand()
 	} else {
 		fmt.Println("Usage: treblle-go -debug")
 		fmt.Println("\nTreblle Go SDK CLI")

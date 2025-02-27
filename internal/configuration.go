@@ -1,16 +1,19 @@
-package treblle
+package internal
 
 import (
 	"os"
+	"runtime"
 	"strings"
 	"time"
+	
+	"github.com/timpratim/treblle-go/models"
 )
 
-var Config internalConfiguration
+var Config InternalConfiguration
 
 // Configuration sets up and customizes communication with the Treblle API
 type Configuration struct {
-	APIKey                 string
+	ApiKey                 string
 	ProjectID              string
 	AdditionalFieldsToMask []string
 	DefaultFieldsToMask    []string
@@ -27,17 +30,17 @@ type Configuration struct {
 	IgnoredEnvironments    []string // Environments where Treblle does not track requests
 }
 
-// internalConfiguration is used for communication with Treblle API and contains optimizations
-type internalConfiguration struct {
-	APIKey                 string
+// InternalConfiguration is used for communication with Treblle API and contains optimizations
+type InternalConfiguration struct {
+	ApiKey                 string
 	ProjectID              string
 	AdditionalFieldsToMask []string
 	DefaultFieldsToMask    []string
 	MaskingEnabled         bool
 	Endpoint               string
 	FieldsMap              map[string]bool
-	serverInfo             ServerInfo
-	languageInfo           LanguageInfo
+	ServerInfo             models.ServerInfo
+	LanguageInfo           models.LanguageInfo
 	Debug                  bool
 	batchErrorCollector    *BatchErrorCollector
 	SDKName                string
@@ -49,8 +52,8 @@ type internalConfiguration struct {
 }
 
 func Configure(config Configuration) {
-	if config.APIKey != "" {
-		Config.APIKey = config.APIKey
+	if config.ApiKey != "" {
+		Config.ApiKey = config.ApiKey
 	}
 	if config.ProjectID != "" {
 		Config.ProjectID = config.ProjectID
@@ -60,19 +63,23 @@ func Configure(config Configuration) {
 	}
 
 	// Initialize server and language info
-	Config.serverInfo = GetServerInfo(nil) // Pass nil as request, protocol will be updated in middleware
-	Config.languageInfo = GetLanguageInfo()
+	// These will be properly set when processing requests
+	Config.ServerInfo = models.ServerInfo{}
+	Config.LanguageInfo = models.LanguageInfo{
+		Name:    "go",
+		Version: runtime.Version(),
+	}
 
 	// Initialize default masking settings
 	Config.MaskingEnabled = true // Enable by default
 
 	// Set SDK Name and Version (Can be overridden via ENV)
-	sdkName := SDKName
+	sdkName := "go"
 	if config.SDKName != "" {
 		sdkName = config.SDKName
 	}
 	
-	sdkVersion := SDKVersion
+	sdkVersion := "1.0.0"
 	if config.SDKVersion != "" {
 		sdkVersion = config.SDKVersion
 	}

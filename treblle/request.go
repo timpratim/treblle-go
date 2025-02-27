@@ -10,23 +10,15 @@ import (
 	"net/url"
 	"strings"
 	"time"
-)
 
-type RequestInfo struct {
-	Timestamp string          `json:"timestamp"`
-	Ip        string          `json:"ip"`
-	Url       string          `json:"url"`
-	UserAgent string          `json:"user_agent"`
-	Method    string          `json:"method"`
-	Headers   json.RawMessage `json:"headers"`
-	Body      json.RawMessage `json:"body"`
-	Query     json.RawMessage `json:"query"`
-}
+	"github.com/timpratim/treblle-go/internal"
+	"github.com/timpratim/treblle-go/models"
+)
 
 var ErrNotJson = errors.New("request body is not JSON")
 
 // Get details about the request
-func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorProvider) (RequestInfo, error) {
+func GetRequestInfo(r *http.Request, startTime time.Time, errorProvider *models.ErrorProvider) (models.RequestInfo, error) {
 
 	headers := make(map[string]string)
 	for k := range r.Header {
@@ -43,14 +35,12 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 		}
 	}
 
-	protocol := "http"
-	if r.Header.Get("X-Forwarded-Proto") == "https" || r.TLS != nil {
-		protocol = "https"
-	}
+	// Detect protocol
+	protocol := DetectProtocol(r)
 
 	// Create URL without query parameters to avoid duplicating them
 	baseURL := protocol + "://" + r.Host + r.URL.Path
-	
+
 	// Get client IP - prefer X-Forwarded-For if available
 	var ip string
 	forwardedFor := r.Header.Get("X-Forwarded-For")
@@ -62,19 +52,20 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 		ip = extractIP(r.RemoteAddr)
 	}
 
-	ri := RequestInfo{
+	ri := models.RequestInfo{
 		Timestamp: startTime.Format("2006-01-02 15:04:05"),
 		Ip:        ip,
 		Url:       baseURL,
 		UserAgent: r.UserAgent(),
 		Method:    r.Method,
+		Protocol:  protocol,
 	}
 
 	// Mask query parameters
 	if len(queryParams) > 0 {
 		sanitizedQuery, err := json.Marshal(maskData(queryParams))
 		if err != nil {
-			errorProvider.AddError(err, RequestError, "query_masking")
+			errorProvider.AddError(err, models.RequestError, "query_masking")
 			return ri, err
 		}
 		ri.Query = json.RawMessage(sanitizedQuery)
@@ -88,7 +79,7 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 	if r.Body != nil && r.Body != http.NoBody {
 		buf, err := io.ReadAll(r.Body)
 		if err != nil {
-			errorProvider.AddError(err, RequestError, "body_reading")
+			errorProvider.AddError(err, models.RequestError, "body_reading")
 			return ri, err
 		}
 		bodyReaderOriginal := io.NopCloser(bytes.NewBuffer(buf))
@@ -96,18 +87,18 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 
 		body, err := io.ReadAll(bodyReaderOriginal)
 		if err != nil {
-			errorProvider.AddError(err, RequestError, "body_reading")
+			errorProvider.AddError(err, models.RequestError, "body_reading")
 			return ri, err
 		}
 
-		sanitizedBody, err := getMaskedJSON(body)
+		sanitizedBody, err := GetMaskedJSON(body)
 		if err != nil {
 			// If it's not JSON, return ErrNotJson
 			if errors.Is(err, ErrNotJson) {
 				return ri, ErrNotJson
 			}
 			// For other errors, add to error provider but continue
-			errorProvider.AddError(err, RequestError, "body_masking")
+			errorProvider.AddError(err, models.RequestError, "body_masking")
 			return ri, nil
 		}
 
@@ -119,7 +110,7 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 		return ri, err
 	}
 
-	sanitizedHeaders, err := getMaskedJSON(headersJson)
+	sanitizedHeaders, err := GetMaskedJSON(headersJson)
 	if err != nil {
 		return ri, err
 	}
@@ -132,7 +123,8 @@ func recoverBody(r *http.Request, bodyReaderCopy io.ReadCloser) {
 	r.Body = bodyReaderCopy
 }
 
-func getMaskedJSON(payloadToMask []byte) (json.RawMessage, error) {
+// GetMaskedJSON masks sensitive data in JSON payloads
+func GetMaskedJSON(payloadToMask []byte) (json.RawMessage, error) {
 	var data interface{}
 	if err := json.Unmarshal(payloadToMask, &data); err != nil {
 		// For testing, preserve the original JSON error
@@ -170,7 +162,7 @@ func maskMap(data map[string]interface{}) map[string]interface{} {
 	result := make(map[string]interface{})
 	for key, value := range data {
 		// Check if this key should be masked
-		if _, exists := Config.FieldsMap[strings.ToLower(key)]; exists {
+		if _, exists := internal.Config.FieldsMap[strings.ToLower(key)]; exists {
 			switch v := value.(type) {
 			case string:
 				result[key] = maskValue(v, key)
@@ -226,9 +218,15 @@ func maskValue(valueToMask string, key string) string {
 	return strings.Repeat("*", 9)
 }
 
+// shouldMaskField checks if a field should be masked based on the configuration
+func shouldMaskField(field string) bool {
+	_, exists := internal.Config.FieldsMap[strings.ToLower(field)]
+	return exists
+}
+
 func extractIP(remoteAddr string) string {
 	var ipAddress string
-	
+
 	// If RemoteAddr contains both IP and port, split and return the IP
 	if strings.Contains(remoteAddr, ":") {
 		ip, _, err := net.SplitHostPort(remoteAddr)
@@ -240,7 +238,7 @@ func extractIP(remoteAddr string) string {
 	} else {
 		ipAddress = remoteAddr
 	}
-	
+
 	// Return the first valid IPv4 address
 	return SelectFirstValidIPv4(ipAddress)
 }

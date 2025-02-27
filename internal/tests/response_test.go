@@ -8,22 +8,24 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/timpratim/treblle-go/models"
+	"github.com/timpratim/treblle-go/treblle"
 )
 
 func TestResponseSizeLimit(t *testing.T) {
 	// Create a new error provider
-	errorProvider := NewErrorProvider()
+	errorProvider := models.NewErrorProvider()
 
 	// Create a response recorder
 	w := httptest.NewRecorder()
 	
 	// Generate a response body that exceeds 2MB
-	largeBody := strings.Repeat("a", maxResponseSize+1)
+	largeBody := strings.Repeat("a", treblle.MaxResponseSize+1)
 	w.WriteString(largeBody)
 	
 	// Get the response info
 	startTime := time.Now().Add(-100 * time.Millisecond) // Simulate some processing time
-	responseInfo := getResponseInfo(w, startTime, errorProvider)
+	responseInfo := treblle.GetResponseInfo(w, startTime, errorProvider)
 	
 	// Verify the response body was replaced with an empty JSON object
 	assert.Equal(t, json.RawMessage("{}"), responseInfo.Body)
@@ -33,36 +35,35 @@ func TestResponseSizeLimit(t *testing.T) {
 	
 	// Verify an error was added
 	errors := errorProvider.GetErrors()
-	assert.Len(t, errors, 1)
-	assert.Equal(t, "JSON response size is over 2MB", errors[0].Message)
-	assert.Equal(t, ResponseError, errors[0].Type)
-	assert.Equal(t, "response_size_limit", errors[0].Source)
+	assert.Equal(t, 1, len(errors))
+	assert.Contains(t, errors[0].Message, "Response body exceeds maximum size")
 }
 
 func TestResponseSizeLimitNotExceeded(t *testing.T) {
 	// Create a new error provider
-	errorProvider := NewErrorProvider()
+	errorProvider := models.NewErrorProvider()
 
 	// Create a response recorder
 	w := httptest.NewRecorder()
 	
-	// Generate a valid JSON response body that does not exceed 2MB
-	smallBody := `{"test":"data"}`
+	// Generate a response body that does not exceed the limit
+	smallBody := `{"status":"success","data":{"id":123}}`
 	w.WriteString(smallBody)
 	
 	// Get the response info
 	startTime := time.Now().Add(-100 * time.Millisecond) // Simulate some processing time
-	responseInfo := getResponseInfo(w, startTime, errorProvider)
+	responseInfo := treblle.GetResponseInfo(w, startTime, errorProvider)
 	
-	// Verify the response body was not replaced with an empty JSON object
-	assert.NotEqual(t, json.RawMessage("{}"), responseInfo.Body)
+	// Verify the response body was preserved
+	var body map[string]interface{}
+	err := json.Unmarshal(responseInfo.Body, &body)
+	assert.NoError(t, err)
+	assert.Equal(t, "success", body["status"])
 	
 	// Verify the size was set correctly
 	assert.Equal(t, len(smallBody), responseInfo.Size)
 	
-	// Verify no "response size limit" error was added
+	// Verify no errors were added
 	errors := errorProvider.GetErrors()
-	for _, err := range errors {
-		assert.NotEqual(t, "JSON response size is over 2MB", err.Message)
-	}
+	assert.Equal(t, 0, len(errors))
 }

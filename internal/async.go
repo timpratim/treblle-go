@@ -1,4 +1,4 @@
-package treblle
+package internal
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/timpratim/treblle-go/models"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -71,7 +72,7 @@ func GetRequestTracker() *RequestTracker {
 }
 
 // Process handles the asynchronous processing of Treblle data
-func (ap *AsyncProcessor) Process(requestInfo RequestInfo, responseInfo ResponseInfo, errorProvider *ErrorProvider) {
+func (ap *AsyncProcessor) Process(requestInfo models.RequestInfo, responseInfo models.ResponseInfo, errorProvider *models.ErrorProvider) {
 	ap.wg.Add(1)
 	
 	// Process asynchronously
@@ -91,14 +92,14 @@ func (ap *AsyncProcessor) Process(requestInfo RequestInfo, responseInfo Response
 		defer ap.sem.Release(1)
 		
 		// Create metadata
-		ti := MetaData{
-			ApiKey:    Config.APIKey,
+		ti := models.MetaData{
+			ApiKey:    Config.ApiKey,
 			ProjectID: Config.ProjectID,
-			Version:   Config.SDKVersion,
-			Sdk:       Config.SDKName,
-			Data: DataInfo{
-				Server:   Config.serverInfo,
-				Language: Config.languageInfo,
+			Version:   models.SDKVersion,
+			Sdk:       models.SDKName,
+			Data: models.DataInfo{
+				Server:   Config.ServerInfo,
+				Language: Config.LanguageInfo,
 				Request:  requestInfo,
 				Response: responseInfo,
 			},
@@ -109,7 +110,7 @@ func (ap *AsyncProcessor) Process(requestInfo RequestInfo, responseInfo Response
 		defer sendCancel()
 		
 		// Send to Treblle with context
-		sendToTreblleWithContext(sendCtx, ti)
+		models.SendToTreblleWithContext(sendCtx, ti)
 	}()
 }
 
@@ -155,17 +156,17 @@ func (rt *RequestTracker) GetStartTime(r *http.Request) (time.Time, bool) {
 }
 
 // StoreRequestInfo stores request info in context
-func (rt *RequestTracker) StoreRequestInfo(r *http.Request, info RequestInfo) *http.Request {
+func (rt *RequestTracker) StoreRequestInfo(r *http.Request, info models.RequestInfo) *http.Request {
 	ctx := context.WithValue(r.Context(), treblleRequestInfoKey, info)
 	return r.WithContext(ctx)
 }
 
 // GetRequestInfo retrieves request info from context
-func (rt *RequestTracker) GetRequestInfo(r *http.Request) (RequestInfo, bool) {
+func (rt *RequestTracker) GetRequestInfo(r *http.Request) (models.RequestInfo, bool) {
 	if val := r.Context().Value(treblleRequestInfoKey); val != nil {
-		if info, ok := val.(RequestInfo); ok {
+		if info, ok := val.(models.RequestInfo); ok {
 			return info, true
 		}
 	}
-	return RequestInfo{}, false
+	return models.RequestInfo{}, false
 }

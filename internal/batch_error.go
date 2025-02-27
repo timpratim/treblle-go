@@ -1,14 +1,16 @@
-package treblle
+package internal
 
 import (
 	"sync"
 	"time"
+	
+	"github.com/timpratim/treblle-go/models"
 )
 
 // BatchErrorCollector handles batch collection and transmission of errors
 type BatchErrorCollector struct {
 	mu            sync.Mutex
-	errors        []ErrorInfo
+	errors        []models.ErrorInfo
 	batchSize     int
 	flushInterval time.Duration
 	done          chan struct{}
@@ -25,7 +27,7 @@ func NewBatchErrorCollector(batchSize int, flushInterval time.Duration) *BatchEr
 	}
 
 	collector := &BatchErrorCollector{
-		errors:        make([]ErrorInfo, 0, batchSize),
+		errors:        make([]models.ErrorInfo, 0, batchSize),
 		batchSize:     batchSize,
 		flushInterval: flushInterval,
 		done:          make(chan struct{}),
@@ -36,7 +38,7 @@ func NewBatchErrorCollector(batchSize int, flushInterval time.Duration) *BatchEr
 }
 
 // Add adds an error to the batch
-func (b *BatchErrorCollector) Add(err ErrorInfo) {
+func (b *BatchErrorCollector) Add(err models.ErrorInfo) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -53,7 +55,7 @@ func (b *BatchErrorCollector) flush() {
 	}
 
 	// Create a copy of errors to send
-	errorsCopy := make([]ErrorInfo, len(b.errors))
+	errorsCopy := make([]models.ErrorInfo, len(b.errors))
 	copy(errorsCopy, b.errors)
 
 	// Clear the current batch
@@ -61,25 +63,25 @@ func (b *BatchErrorCollector) flush() {
 
 	// Send errors asynchronously
 	b.wg.Add(1)
-	go func(errors []ErrorInfo) {
+	go func(errors []models.ErrorInfo) {
 		defer b.wg.Done()
 		// Create metadata for batch transmission
-		meta := MetaData{
-			ApiKey:    Config.APIKey,
-			ProjectID: Config.ProjectID,
-			Version:   Config.SDKVersion,
-			Sdk:       Config.SDKName,
-			Data: DataInfo{
-				Server:   Config.serverInfo,
-				Language: Config.languageInfo,
-				Request:  RequestInfo{},  // Empty request info for batch errors
-				Response: ResponseInfo{}, // Empty response info for batch errors
+		meta := models.MetaData{
+			ApiKey:    models.Config.ApiKey,
+			ProjectID: models.Config.ProjectId,
+			Version:   models.Config.SDKVersion,
+			Sdk:       models.Config.SDKName,
+			Data: models.DataInfo{
+				Server:   models.Config.ServerInfo,
+				Language: models.Config.LanguageInfo,
+				Request:  models.RequestInfo{},  // Empty request info for batch errors
+				Response: models.ResponseInfo{}, // Empty response info for batch errors
 				Errors:   errors,
 			},
 		}
 
 		// Send to Treblle
-		sendToTreblle(meta)
+		models.SendToTreblle(meta)
 	}(errorsCopy)
 }
 
@@ -121,4 +123,11 @@ func (b *BatchErrorCollector) Flush() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.flush()
+}
+
+// GetErrorCount returns the current number of errors in the batch
+func (b *BatchErrorCollector) GetErrorCount() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.errors)
 }

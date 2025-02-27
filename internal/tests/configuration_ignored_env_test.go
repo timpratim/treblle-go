@@ -3,6 +3,8 @@ package treblle
 import (
 	"os"
 	"testing"
+	
+	"github.com/timpratim/treblle-go/internal"
 )
 
 func TestIgnoredEnvironments(t *testing.T) {
@@ -87,15 +89,16 @@ func TestIgnoredEnvironments(t *testing.T) {
 			}
 			
 			// Configure Treblle with test case settings
-			config := Configuration{
-				APIKey:              "test-api-key",
+			config := internal.Configuration{
+				ApiKey:              "test-api-key",
 				ProjectID:           "test-project-id",
 				IgnoredEnvironments: tc.ignoredEnvs,
+				AdditionalFieldsToMask: []string{},
 			}
-			Configure(config)
+			internal.Configure(config)
 			
 			// Check if environment is ignored
-			result := IsEnvironmentIgnored()
+			result := internal.IsEnvironmentIgnored()
 			
 			if result != tc.expectedIgnored {
 				t.Errorf("Expected IsEnvironmentIgnored() to return %v, got %v", 

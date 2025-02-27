@@ -5,16 +5,19 @@ import (
 	"sync"
 	"testing"
 	"time"
+	
+	"github.com/timpratim/treblle-go/internal"
+	"github.com/timpratim/treblle-go/models"
 )
 
 func TestAsyncProcessor_Process(t *testing.T) {
 	// Setup test configuration
-	originalConfig := Config
+	originalConfig := internal.Config
 	defer func() {
-		Config = originalConfig
+		internal.Config = originalConfig
 	}()
 
-	Config = internalConfiguration{
+	internal.Config = internal.InternalConfiguration{
 		AsyncProcessingEnabled:  true,
 		MaxConcurrentProcessing: 2,
 		AsyncShutdownTimeout:    1 * time.Second,
@@ -30,23 +33,23 @@ func TestAsyncProcessor_Process(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	
 	// Create a mock request info
-	requestInfo := RequestInfo{
+	requestInfo := models.RequestInfo{
 		Method: "GET",
 		Url:    "/test",
 	}
 	
 	// Create a mock response info
-	responseInfo := ResponseInfo{
+	responseInfo := models.ResponseInfo{
 		Code:     200,
 		Size:     10,
 		LoadTime: 5.0,
 	}
 	
 	// Create a mock error provider
-	errorProvider := NewErrorProvider()
+	errorProvider := models.NewErrorProvider()
 	
 	// Create a new async processor
-	processor := GetAsyncProcessor()
+	processor := internal.GetAsyncProcessor()
 	
 	// Test processing multiple requests
 	var wg sync.WaitGroup
@@ -67,7 +70,7 @@ func TestAsyncProcessor_Process(t *testing.T) {
 
 func TestRequestTracker(t *testing.T) {
 	// Create a new request tracker
-	tracker := GetRequestTracker()
+	tracker := internal.GetRequestTracker()
 	
 	// Create a test request with context
 	req, err := http.NewRequest("GET", "/test", nil)
@@ -90,7 +93,7 @@ func TestRequestTracker(t *testing.T) {
 	}
 	
 	// Test storing and retrieving request info
-	requestInfo := RequestInfo{
+	requestInfo := models.RequestInfo{
 		Method: "GET",
 		Url:    "/test",
 	}
@@ -109,12 +112,12 @@ func TestRequestTracker(t *testing.T) {
 
 func TestAsyncShutdown(t *testing.T) {
 	// Setup test configuration
-	originalConfig := Config
+	originalConfig := internal.Config
 	defer func() {
-		Config = originalConfig
+		internal.Config = originalConfig
 	}()
 
-	Config = internalConfiguration{
+	internal.Config = internal.InternalConfiguration{
 		AsyncProcessingEnabled:  true,
 		MaxConcurrentProcessing: 2,
 		AsyncShutdownTimeout:    500 * time.Millisecond,
@@ -123,7 +126,7 @@ func TestAsyncShutdown(t *testing.T) {
 	}
 	
 	// Create a new async processor
-	processor := GetAsyncProcessor()
+	processor := internal.GetAsyncProcessor()
 	
 	// Skip the semaphore test as it's an implementation detail
 	// Just test the shutdown timeout

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/timpratim/treblle-go/treblle"
 )
 
 func TestSelectFirstValidIPv4(t *testing.T) {
@@ -47,7 +48,7 @@ func TestSelectFirstValidIPv4(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := SelectFirstValidIPv4(tc.input)
+			result := treblle.SelectFirstValidIPv4(tc.input)
 			assert.Equal(t, tc.expected, result, "SelectFirstValidIPv4 returned unexpected result")
 		})
 	}
@@ -101,7 +102,7 @@ func TestDetectProtocol(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := DetectProtocol(tc.request)
+			result := treblle.DetectProtocol(tc.request)
 			assert.Equal(t, tc.expected, result, "DetectProtocol returned unexpected result")
 		})
 	}

@@ -5,32 +5,34 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/timpratim/treblle-go/internal"
+	"github.com/timpratim/treblle-go/models"
 )
 
 func TestBatchErrorCollector(t *testing.T) {
 	// Configure Treblle with test settings
-	Configure(Configuration{
-		APIKey:    "test-api-key",
+	internal.Configure(internal.Configuration{
+		ApiKey:    "test-api-key",
 		ProjectID: "test-project-id",
 		Endpoint:  "http://localhost:8080",
 	})
 
 	// Create a batch collector with small batch size and interval for testing
-	collector := NewBatchErrorCollector(2, 100*time.Millisecond)
+	collector := internal.NewBatchErrorCollector(2, 100*time.Millisecond)
 	defer collector.Close()
 
 	// Create test errors
-	testErrors := []ErrorInfo{
+	testErrors := []models.ErrorInfo{
 		{
 			Message:  "Test error 1",
-			Type:    RequestError,
+			Type:    string(models.RequestError),
 			Source:  "test",
 			Line:    42,
 			File:    "test.go",
 		},
 		{
 			Message:  "Test error 2",
-			Type:    ResponseError,
+			Type:    string(models.ResponseError),
 			Source:  "test",
 			Line:    43,
 			File:    "test.go",
@@ -48,9 +50,7 @@ func TestBatchErrorCollector(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		// Verify the batch was sent (errors cleared)
-		collector.mu.Lock()
-		assert.Equal(t, 0, len(collector.errors), "Batch should be cleared after reaching batch size")
-		collector.mu.Unlock()
+		assert.Equal(t, 0, collector.GetErrorCount(), "Batch should be cleared after reaching batch size")
 	})
 
 	// Test interval trigger
@@ -62,9 +62,7 @@ func TestBatchErrorCollector(t *testing.T) {
 		time.Sleep(150 * time.Millisecond)
 
 		// Verify the batch was sent
-		collector.mu.Lock()
-		assert.Equal(t, 0, len(collector.errors), "Batch should be cleared after interval")
-		collector.mu.Unlock()
+		assert.Equal(t, 0, collector.GetErrorCount(), "Batch should be cleared after interval")
 	})
 
 	// Test close functionality
@@ -76,8 +74,6 @@ func TestBatchErrorCollector(t *testing.T) {
 		collector.Close()
 
 		// Verify all errors were flushed
-		collector.mu.Lock()
-		assert.Equal(t, 0, len(collector.errors), "All errors should be flushed on close")
-		collector.mu.Unlock()
+		assert.Equal(t, 0, collector.GetErrorCount(), "All errors should be flushed on close")
 	})
 }

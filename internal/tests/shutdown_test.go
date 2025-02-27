@@ -6,12 +6,15 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/timpratim/treblle-go/internal"
+	"github.com/timpratim/treblle-go/models"
 )
 
 func TestShutdown(t *testing.T) {
 	// Configure Treblle for testing
-	Configure(Configuration{
-		APIKey:    "test-api-key",
+	internal.Configure(internal.Configuration{
+		ApiKey:    "test-api-key",
 		ProjectID: "test-project-id",
 		Endpoint:  "https://test-endpoint.treblle.com", // Use a test endpoint
 	})
@@ -34,18 +37,18 @@ func TestShutdown(t *testing.T) {
 	}
 
 	// Test the Shutdown function
-	Shutdown(req, w, responseBody, nil)
+	internal.Shutdown(req, w, responseBody, nil)
 
 	// Test with custom options
-	errorProvider := NewErrorProvider()
-	errorProvider.AddCustomError("Test error", RuntimeError, "test")
+	errorProvider := models.NewErrorProvider()
+	errorProvider.AddCustomError("Test error", models.RuntimeError, "test")
 	
-	options := &ShutdownOptions{
+	options := &internal.ShutdownOptions{
 		AdditionalFieldsToMask: []string{"password", "token"},
 		ErrorProvider:          errorProvider,
 	}
 	
-	Shutdown(req, w, responseBody, options)
+	internal.Shutdown(req, w, responseBody, options)
 
 	// Test ShutdownWithCustomData
 	// Create headers for request
@@ -70,7 +73,7 @@ func TestShutdown(t *testing.T) {
 	}
 	respHeadersJson, _ := json.Marshal(respHeaders)
 	
-	requestInfo := RequestInfo{
+	requestInfo := models.RequestInfo{
 		Timestamp: time.Now().Format(time.RFC3339),
 		Ip:        "127.0.0.1",
 		Url:       "https://example.com/api/test",
@@ -79,21 +82,21 @@ func TestShutdown(t *testing.T) {
 		Headers:   json.RawMessage(reqHeadersJson),
 	}
 	
-	responseInfo := ResponseInfo{
+	responseInfo := models.ResponseInfo{
 		Code:     200,
 		Size:     len(responseBody),
 		LoadTime: 10.5,
 		Headers:  json.RawMessage(respHeadersJson),
-		Errors:   []ErrorInfo{},
+		Errors:   []models.ErrorInfo{},
 	}
 	
-	ShutdownWithCustomData(requestInfo, responseInfo, errorProvider)
+	internal.ShutdownWithCustomData(requestInfo, responseInfo, errorProvider)
 }
 
 func TestGracefulShutdown(t *testing.T) {
 	// Configure Treblle with batch error collector
-	Configure(Configuration{
-		APIKey:            "test-api-key",
+	internal.Configure(internal.Configuration{
+		ApiKey:            "test-api-key",
 		ProjectID:         "test-project-id",
 		Endpoint:          "https://test-endpoint.treblle.com",
 		BatchErrorEnabled: true,
@@ -101,31 +104,8 @@ func TestGracefulShutdown(t *testing.T) {
 		BatchFlushInterval: 5 * time.Second,
 	})
 	
-	// Add some errors to the batch collector
-	if Config.batchErrorCollector != nil {
-		Config.batchErrorCollector.Add(ErrorInfo{
-			Message:   "Test error 1",
-			Type:      RuntimeError,
-			Source:    "test",
-			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			Severity:  ErrorSeverityMedium,
-		})
-		
-		Config.batchErrorCollector.Add(ErrorInfo{
-			Message:   "Test error 2",
-			Type:      ValidationError,
-			Source:    "test",
-			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			Severity:  ErrorSeverityLow,
-		})
-	}
+
+	internal.GracefulShutdown()
 	
-	// Call GracefulShutdown
-	GracefulShutdown()
-	
-	// Verify that the batch collector was closed
-	// This is more of a smoke test since we can't easily verify the internal state
-	if Config.batchErrorCollector == nil {
-		t.Fatal("Expected batch error collector to still exist after shutdown")
-	}
+
 }

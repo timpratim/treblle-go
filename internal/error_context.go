@@ -1,4 +1,4 @@
-package treblle
+package internal
 
 import (
 	"fmt"

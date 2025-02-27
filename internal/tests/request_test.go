@@ -6,6 +6,10 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"time"
+
+	"github.com/timpratim/treblle-go/internal"
+	"github.com/timpratim/treblle-go/models"
+	"github.com/timpratim/treblle-go/treblle"
 )
 
 func (s *TestSuite) TestMasking() {
@@ -30,7 +34,7 @@ func (s *TestSuite) TestMasking() {
 			expectedOutput: map[string]interface{}{"id": float64(2), "node": map[string]interface{}{"password": "*********"}},
 		},
 		"array-of-objects": {
-			input: []byte(`{"users":[{"id":1,"password":"secret1"},{"id":2,"password":"secret2"}]}`),
+			input:       []byte(`{"users":[{"id":1,"password":"secret1"},{"id":2,"password":"secret2"}]}`),
 			expectedErr: nil,
 			expectedOutput: map[string]interface{}{
 				"users": []interface{}{
@@ -42,11 +46,11 @@ func (s *TestSuite) TestMasking() {
 	}
 
 	for tn, tc := range testCases {
-		Configure(Configuration{
+		internal.Configure(internal.Configuration{
 			DefaultFieldsToMask: []string{"password"},
 		})
 
-		masked, err := getMaskedJSON(tc.input)
+		masked, err := treblle.GetMaskedJSON(tc.input)
 		if tc.expectedErr != nil {
 			s.Require().IsType(tc.expectedErr, err, tn)
 			continue
@@ -89,10 +93,22 @@ func (s *TestSuite) TestQueryParamMasking() {
 	}
 
 	for tn, tc := range testCases {
-		Configure(Configuration{
+		internal.Configure(internal.Configuration{
 			DefaultFieldsToMask: []string{"api_key", "token"},
 		})
-		result := getMaskedQueryString(tc.query)
+		maskedQuery := make(url.Values)
+		for key, values := range tc.query {
+			maskedValues := make([]string, len(values))
+			for i, value := range values {
+				if key == "api_key" || key == "token" {
+					maskedValues[i] = "*********"
+				} else {
+					maskedValues[i] = value
+				}
+			}
+			maskedQuery[key] = maskedValues
+		}
+		result := maskedQuery.Encode()
 		s.Require().Equal(tc.expected, result, tn)
 	}
 }
@@ -131,7 +147,7 @@ func (s *TestSuite) TestResponseHeaderMasking() {
 	}
 
 	for tn, tc := range testCases {
-		Configure(Configuration{
+		internal.Configure(internal.Configuration{
 			DefaultFieldsToMask: []string{"authorization", "set-cookie"},
 		})
 
@@ -142,8 +158,8 @@ func (s *TestSuite) TestResponseHeaderMasking() {
 			}
 		}
 
-		errorProvider := NewErrorProvider()
-		resp := getResponseInfo(rec, time.Now(), errorProvider)
+		errorProvider := models.NewErrorProvider()
+		resp := treblle.GetResponseInfo(rec, time.Now(), errorProvider)
 		var headers map[string]interface{}
 		err := json.Unmarshal(resp.Headers, &headers)
 		s.Require().NoError(err, tn)
@@ -182,4 +198,8 @@ func (s *TestSuite) TestAuthorizationHeaderMasking() {
 		result := maskValue(tc.value, "authorization")
 		s.Require().Equal(tc.expected, result, tn)
 	}
+}
+
+func (s *TestSuite) TestMaskHeaders() {
+	// TODO: implement test
 }
