@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"math/rand"
 	"net/http"
 	"runtime"
 	"time"
@@ -122,13 +123,24 @@ func getTreblleBaseUrl() string {
 	if Config.Endpoint != "" {
 		return Config.Endpoint
 	}
+	
+	// For debug mode
+	if Config.Debug {
+		return "https://debug.treblle.com/"
+	}
+	
 	// Default Treblle endpoints
 	treblleBaseUrls := []string{
 		"https://rocknrolla.treblle.com",
 		"https://punisher.treblle.com",
 		"https://sicario.treblle.com",
 	}
-	return treblleBaseUrls[0]
+	
+	// Use random selection for load balancing
+	rand.Seed(time.Now().UnixNano())
+	randomUrlIndex := rand.Intn(len(treblleBaseUrls))
+	
+	return treblleBaseUrls[randomUrlIndex]
 }
 
 // GetRequestInfo extracts information from an HTTP request

@@ -60,7 +60,7 @@ func getTreblleBaseUrl() string {
 		"https://sicario.treblle.com",
 	}
 
-	rand.Seed(time.Now().Unix())
+	rand.Seed(time.Now().UnixNano())
 	randomUrlIndex := rand.Intn(len(treblleBaseUrls))
 
 	return treblleBaseUrls[randomUrlIndex]
