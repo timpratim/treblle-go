@@ -38,8 +38,12 @@ func GetRequestInfo(r *http.Request, startTime time.Time, errorProvider *models.
 	// Detect protocol
 	protocol := DetectProtocol(r)
 
+	rawPath := r.URL.EscapedPath()
+	if rawPath == "" {
+		rawPath = r.URL.Path
+	}
 	// Create URL without query parameters to avoid duplicating them
-	baseURL := protocol + "://" + r.Host + r.URL.Path
+	baseURL := protocol + "://" + r.Host + rawPath
 
 	// Get client IP - prefer X-Forwarded-For if available
 	var ip string

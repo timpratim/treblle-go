@@ -2,6 +2,7 @@ package treblle
 
 import (
 	"errors"
+	"fmt"
 	"runtime"
 	"strconv"
 	"strings"
@@ -96,8 +97,21 @@ func (ep *ErrorProvider) AddError(err error, errType models.ErrorType, source st
 	}
 
 	// Add additional context if error has it
-	if _, ok := err.(*internal.ErrorWithContext); ok {
-		// Add context to errorInfo
+	if errWithContext, ok := err.(*internal.ErrorWithContext); ok {
+		// Format context information
+		contextParts := []string{}
+		if errWithContext.Context.Function != "" {
+			contextParts = append(contextParts, fmt.Sprintf("function: %s", errWithContext.Context.Function))
+		}
+		if errWithContext.Context.Package != "" {
+			contextParts = append(contextParts, fmt.Sprintf("package: %s", errWithContext.Context.Package))
+		}
+		if errWithContext.Context.Component != "" {
+			contextParts = append(contextParts, fmt.Sprintf("component: %s", errWithContext.Context.Component))
+		}
+		if len(contextParts) > 0 {
+			errorInfo.Context = strings.Join(contextParts, ", ")
+		}
 	}
 
 	// Add to errors slice
