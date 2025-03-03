@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
-	
+
 	"github.com/timpratim/treblle-go/models"
 )
 
@@ -13,42 +13,42 @@ var Config InternalConfiguration
 
 // Configuration sets up and customizes communication with the Treblle API
 type Configuration struct {
-	ApiKey                 string
-	ProjectID              string
-	AdditionalFieldsToMask []string
-	DefaultFieldsToMask    []string
-	MaskingEnabled         bool
-	Endpoint               string // Custom endpoint for testing
-	BatchErrorEnabled      bool   // Enable batch error collection
-	BatchErrorSize         int    // Size of error batch before sending
-	BatchFlushInterval     time.Duration // Interval to flush errors if batch size not reached
-	SDKName                string // Defaults to "go"
-	SDKVersion             string // Defaults to "1.0.0"
-	AsyncProcessingEnabled bool   // Enable asynchronous request processing
-	MaxConcurrentProcessing int   // Maximum number of concurrent async operations (default: 10)
-	AsyncShutdownTimeout   time.Duration // Timeout for async shutdown (default: 5s)
-	IgnoredEnvironments    []string // Environments where Treblle does not track requests
+	ApiKey                  string
+	ProjectID               string
+	AdditionalFieldsToMask  []string
+	DefaultFieldsToMask     []string
+	MaskingEnabled          bool
+	Endpoint                string        // Custom endpoint for testing
+	BatchErrorEnabled       bool          // Enable batch error collection
+	BatchErrorSize          int           // Size of error batch before sending
+	BatchFlushInterval      time.Duration // Interval to flush errors if batch size not reached
+	SDKName                 string        // Defaults to "go"
+	SDKVersion              string        // Defaults to "1.0.0"
+	AsyncProcessingEnabled  bool          // Enable asynchronous request processing
+	MaxConcurrentProcessing int           // Maximum number of concurrent async operations (default: 10)
+	AsyncShutdownTimeout    time.Duration // Timeout for async shutdown (default: 5s)
+	IgnoredEnvironments     []string      // Environments where Treblle does not track requests
 }
 
 // InternalConfiguration is used for communication with Treblle API and contains optimizations
 type InternalConfiguration struct {
-	ApiKey                 string
-	ProjectID              string
-	AdditionalFieldsToMask []string
-	DefaultFieldsToMask    []string
-	MaskingEnabled         bool
-	Endpoint               string
-	FieldsMap              map[string]bool
-	ServerInfo             models.ServerInfo
-	LanguageInfo           models.LanguageInfo
-	Debug                  bool
-	batchErrorCollector    *BatchErrorCollector
-	SDKName                string
-	SDKVersion             string
-	AsyncProcessingEnabled bool
+	ApiKey                  string
+	ProjectID               string
+	AdditionalFieldsToMask  []string
+	DefaultFieldsToMask     []string
+	MaskingEnabled          bool
+	Endpoint                string
+	FieldsMap               map[string]bool
+	ServerInfo              models.ServerInfo
+	LanguageInfo            models.LanguageInfo
+	Debug                   bool
+	batchErrorCollector     *BatchErrorCollector
+	SDKName                 string
+	SDKVersion              string
+	AsyncProcessingEnabled  bool
 	MaxConcurrentProcessing int
-	AsyncShutdownTimeout   time.Duration
-	IgnoredEnvironments    []string // Environments where Treblle does not track requests
+	AsyncShutdownTimeout    time.Duration
+	IgnoredEnvironments     []string // Environments where Treblle does not track requests
 }
 
 func Configure(config Configuration) {
@@ -78,22 +78,22 @@ func Configure(config Configuration) {
 	if config.SDKName != "" {
 		sdkName = config.SDKName
 	}
-	
+
 	sdkVersion := "1.0.0"
 	if config.SDKVersion != "" {
 		sdkVersion = config.SDKVersion
 	}
-	
+
 	Config.SDKName = getEnvOrDefault("TREBLLE_SDK_NAME", sdkName)
 	Config.SDKVersion = getEnvOrDefault("TREBLLE_SDK_VERSION", sdkVersion)
-	
+
 	// Configure async processing
 	Config.AsyncProcessingEnabled = config.AsyncProcessingEnabled
 	Config.MaxConcurrentProcessing = config.MaxConcurrentProcessing
 	if Config.MaxConcurrentProcessing <= 0 {
 		Config.MaxConcurrentProcessing = 10 // Default to 10 concurrent operations
 	}
-	
+
 	Config.AsyncShutdownTimeout = config.AsyncShutdownTimeout
 	if Config.AsyncShutdownTimeout <= 0 {
 		Config.AsyncShutdownTimeout = 5 * time.Second // Default to 5 seconds
@@ -162,6 +162,12 @@ func getDefaultFieldsToMask() []string {
 		"creditScore",
 		"api_key",
 		"apiKey",
+		"credit_card",
+		"creditCard",
+		"authorization",
+		"authorizationToken",
+		"token",
+		"tokenId",
 	}
 }
 
