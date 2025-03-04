@@ -2,6 +2,7 @@ package treblle
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -16,6 +17,7 @@ type RequestInfo struct {
 	Timestamp string          `json:"timestamp"`
 	Ip        string          `json:"ip"`
 	Url       string          `json:"url"`
+	RoutePath string          `json:"route_path"`
 	UserAgent string          `json:"user_agent"`
 	Method    string          `json:"method"`
 	Headers   json.RawMessage `json:"headers"`
@@ -24,6 +26,19 @@ type RequestInfo struct {
 }
 
 var ErrNotJson = errors.New("request body is not JSON")
+
+// SetRoutePath sets a custom route path for a request context
+// This can be called before the middleware to set the route pattern for frameworks
+// that don't automatically expose their route templates
+func SetRoutePath(r *http.Request, pattern string) *http.Request {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, routePathKey, pattern)
+	return r.WithContext(ctx)
+}
+
+// RoutePathKey is the context key for storing route paths
+type routePathKeyType struct{}
+var routePathKey = routePathKeyType{}
 
 // Get details about the request
 func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorProvider) (RequestInfo, error) {
@@ -66,6 +81,7 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 		Timestamp: startTime.Format("2006-01-02 15:04:05"),
 		Ip:        ip,
 		Url:       baseURL,
+		RoutePath: r.URL.Path,  // For now, set to the actual path. Later you'll set this to the route pattern.
 		UserAgent: r.UserAgent(),
 		Method:    r.Method,
 	}

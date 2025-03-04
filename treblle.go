@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"time"
@@ -50,17 +51,17 @@ func sendToTreblle(treblleInfo MetaData) {
 }
 
 // sendToTreblleWithContext sends data to Treblle with context support
-func sendToTreblleWithContext(ctx context.Context, treblleInfo MetaData) {
+func sendToTreblleWithContext(ctx context.Context, treblleInfo MetaData) error {
 	baseUrl := getTreblleBaseUrl()
 
 	bytesRepresentation, err := json.Marshal(treblleInfo)
 	if err != nil {
-		return
+		return err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseUrl, bytes.NewBuffer(bytesRepresentation))
 	if err != nil {
-		return
+		return err
 	}
 	// Set the content type from the writer, it includes necessary boundary as well
 	req.Header.Set("Content-Type", "application/json")
@@ -71,7 +72,13 @@ func sendToTreblleWithContext(ctx context.Context, treblleInfo MetaData) {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return
+		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("treblle api returned error status: %s", resp.Status)
+	}
+
+	return nil
 }

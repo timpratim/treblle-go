@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"time"
+	
+	"github.com/gorilla/mux"
 )
 
 func Middleware(next http.Handler) http.Handler {
@@ -43,6 +45,18 @@ func Middleware(next http.Handler) http.Handler {
 		requestInfo, errReqInfo := getRequestInfo(r, startTime, errorProvider)
 		if errReqInfo != nil && !errors.Is(errReqInfo, ErrNotJson) {
 			errorProvider.AddError(errReqInfo, RequestError, "request_processing")
+		}
+		
+		// First check if a route path was manually set
+		if pattern, ok := r.Context().Value(routePathKey).(string); ok && pattern != "" {
+			requestInfo.RoutePath = pattern
+		} else {
+			// Try to extract route pattern from gorilla/mux if available
+			if route := mux.CurrentRoute(r); route != nil {
+				if pattern, err := route.GetPathTemplate(); err == nil && pattern != "" {
+					requestInfo.RoutePath = pattern
+				}
+			}
 		}
 
 		// Store request info in context if async processing is enabled
@@ -103,8 +117,9 @@ func Middleware(next http.Handler) http.Handler {
 				go func(ti MetaData) {
 					defer func() {
 						if err := recover(); err != nil {
+							fmt.Printf("Panic recovered in goroutine: %v\n", err)
 						// Silently recover from panic
-					}
+						}
 					}()
 					sendToTreblle(ti)
 				}(ti)
