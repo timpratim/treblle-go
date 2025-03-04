@@ -60,6 +60,7 @@ func GetRequestInfo(r *http.Request, startTime time.Time, errorProvider *models.
 		Timestamp: startTime.Format("2006-01-02 15:04:05"),
 		Ip:        ip,
 		Url:       baseURL,
+		RoutePath: r.URL.Path,  // Initially set to the actual path. Will be overridden by route pattern if available.
 		UserAgent: r.UserAgent(),
 		Method:    r.Method,
 		Protocol:  protocol,

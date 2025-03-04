@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/timpratim/treblle-go/internal"
 	"github.com/timpratim/treblle-go/models"
 )
@@ -47,6 +48,19 @@ func Middleware(next http.Handler) http.Handler {
 		requestInfo, errReqInfo := GetRequestInfo(r, startTime, errorProvider)
 		if errReqInfo != nil && !errors.Is(errReqInfo, ErrNotJson) {
 			errorProvider.AddError(errReqInfo, models.RequestError, "request_processing")
+		}
+		
+		// Extract route pattern from context or router
+		// First check if a route path was manually set
+		if pattern, ok := GetRoutePathFromContext(r); ok {
+			requestInfo.RoutePath = pattern
+		} else {
+			// Try to extract route pattern from gorilla/mux if available
+			if route := mux.CurrentRoute(r); route != nil {
+				if pattern, err := route.GetPathTemplate(); err == nil && pattern != "" {
+					requestInfo.RoutePath = pattern
+				}
+			}
 		}
 
 		// Store request info in context if async processing is enabled

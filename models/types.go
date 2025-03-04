@@ -9,6 +9,7 @@ type RequestInfo struct {
 	Timestamp string          `json:"timestamp"`
 	Ip        string          `json:"ip"`
 	Url       string          `json:"url"`
+	RoutePath string          `json:"route_path"`
 	UserAgent string          `json:"user_agent"`
 	Method    string          `json:"method"`
 	Protocol  string          `json:"protocol"`

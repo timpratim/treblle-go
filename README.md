@@ -48,7 +48,15 @@ Integrate Treblle's middleware with your router.
 
 ```go
 mux := http.NewServeMux()
-mux.Handle("/", treblle.Middleware(http.HandlerFunc(myHandler)))
+mux.Handle("/users", treblle.Middleware(treblle.HandleFunc("/users", myHandler)))
+```
+
+#### Using Gorilla Mux (Recommended)
+
+```go
+r := mux.NewRouter()
+r.Use(treblle.Middleware) // Route patterns are automatically detected
+r.HandleFunc("/users/{id}", getUserHandler)
 ```
 
 #### Using `chi`
@@ -56,6 +64,44 @@ mux.Handle("/", treblle.Middleware(http.HandlerFunc(myHandler)))
 ```go
 r := chi.NewRouter()
 r.Use(treblle.Middleware)
+```
+
+## API Endpoint Route Paths 🛣️
+
+Treblle now tracks your API endpoint route patterns, providing better analytics by grouping similar requests together.
+
+### Automatic Route Pattern Detection
+
+With Gorilla Mux, route patterns are automatically detected:
+
+```go
+r := mux.NewRouter()
+r.Use(treblle.Middleware)
+r.HandleFunc("/users/{id}", handleUserGet)
+```
+
+### Manual Route Pattern Setting
+
+For other routers, use `HandleFunc` or `WithRoutePath` helpers:
+
+```go
+// Standard library
+mux.Handle("/users/:id", treblle.Middleware(treblle.HandleFunc("/users/:id", handleUserGet)))
+
+// Other routers
+router.GET("/users/:id", wrapHandler(treblle.WithRoutePath("/users/:id", 
+    treblle.Middleware(http.HandlerFunc(handleUserGet)))))
+```
+
+### Setting Route Paths Programmatically
+
+You can set the route path within your handler:
+
+```go
+func myHandler(w http.ResponseWriter, r *http.Request) {
+    r = treblle.SetRoutePath(r, "/api/custom/:param")
+    // Handler logic
+}
 ```
 
 ## Tracking Customer & Trace IDs 🏷️
