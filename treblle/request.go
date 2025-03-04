@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/timpratim/treblle-go/internal"
 	"github.com/timpratim/treblle-go/models"
 )
@@ -19,13 +18,13 @@ var ErrNotJson = errors.New("request body is not JSON")
 
 // Get details about the request
 func GetRequestInfo(r *http.Request, startTime time.Time, errorProvider *models.ErrorProvider) (models.RequestInfo, error) {
-
+	// Get headers
 	headers := make(map[string]string)
 	for k := range r.Header {
 		headers[k] = r.Header.Get(k)
 	}
 
-	// Get and mask query parameters
+	// Get query parameters
 	queryParams := make(map[string]interface{})
 	for key, values := range r.URL.Query() {
 		if len(values) == 1 {
@@ -35,93 +34,83 @@ func GetRequestInfo(r *http.Request, startTime time.Time, errorProvider *models.
 		}
 	}
 
-	// Detect protocol for URL construction
-	protocol := DetectProtocol(r)
-
-	rawPath := r.URL.EscapedPath()
-	if rawPath == "" {
-		rawPath = r.URL.Path
-	}
-	// Create URL without query parameters to avoid duplicating them
-	baseURL := protocol + "://" + r.Host + rawPath
-
-	// Get client IP - prefer X-Forwarded-For if available
-	var ip string
-	forwardedFor := r.Header.Get("X-Forwarded-For")
-	if forwardedFor != "" {
-		// Use the SelectFirstValidIPv4 function directly on the header value
-		ip = SelectFirstValidIPv4(forwardedFor)
-	} else {
-		// Fall back to RemoteAddr
-		ip = extractIP(r.RemoteAddr)
-	}
-
-	ri := models.RequestInfo{
-		Timestamp: startTime.UTC().Format("2006-01-02 15:04:05"),
-		Ip:        ip,
-		Url:       baseURL,
-		RoutePath: r.URL.Path, // Initially set to the actual path. Will be overridden by route pattern if available.
-		UserAgent: r.UserAgent(),
-		Method:    r.Method,
-		Protocol:  r.Proto, // Use the actual protocol version from the request
-	}
-
-	// Mask query parameters
-	if len(queryParams) > 0 {
-		sanitizedQuery, err := json.Marshal(maskData(queryParams))
-		if err != nil {
-			errorProvider.AddError(err, models.RequestError, "query_masking")
-			return ri, err
-		}
-		ri.Query = json.RawMessage(sanitizedQuery)
-
-		// Add masked query string back to URL
-		if queryStr := getMaskedQueryString(r.URL.Query()); queryStr != "" {
-			ri.Url = baseURL + "?" + queryStr
-		}
-	}
-
+	// Get body if present
+	var bodyData map[string]interface{}
 	if r.Body != nil && r.Body != http.NoBody {
 		buf, err := io.ReadAll(r.Body)
 		if err != nil {
 			errorProvider.AddError(err, models.RequestError, "body_reading")
-			return ri, err
+			return models.RequestInfo{}, err
 		}
-		bodyReaderOriginal := io.NopCloser(bytes.NewBuffer(buf))
+		// Restore the body for downstream handlers
 		defer recoverBody(r, io.NopCloser(bytes.NewBuffer(buf)))
 
-		body, err := io.ReadAll(bodyReaderOriginal)
-		if err != nil {
-			errorProvider.AddError(err, models.RequestError, "body_reading")
-			return ri, err
-		}
-
-		sanitizedBody, err := GetMaskedJSON(body)
-		if err != nil {
+		if err := json.Unmarshal(buf, &bodyData); err != nil {
 			// If it's not JSON, return ErrNotJson
-			if errors.Is(err, ErrNotJson) {
-				return ri, ErrNotJson
+			if _, ok := err.(*json.SyntaxError); ok {
+				return models.RequestInfo{}, ErrNotJson
 			}
 			// For other errors, add to error provider but continue
-			errorProvider.AddError(err, models.RequestError, "body_masking")
-			return ri, nil
+			errorProvider.AddError(err, models.RequestError, "body_parsing")
 		}
-
-		ri.Body = sanitizedBody
 	}
 
+	// Get client IP - prefer X-Forwarded-For if available
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.RemoteAddr
+		if i := strings.LastIndex(ip, ":"); i != -1 {
+			ip = ip[:i]
+		}
+	}
+	if ip == "" {
+		ip = "bogon" // Match Laravel's fallback
+	}
+
+	// Get route path from router or fallback to URL path
+	routePath := r.URL.Path
+	if route := mux.CurrentRoute(r); route != nil {
+		if pattern, err := route.GetPathTemplate(); err == nil {
+			routePath = pattern
+		}
+	}
+
+	// Detect device type
+	device := "desktop"
+	if isMobile(r.UserAgent()) {
+		device = "mobile"
+	}
+
+	// Sanitize headers
 	headersJson, err := json.Marshal(headers)
 	if err != nil {
-		return ri, err
+		return models.RequestInfo{}, err
 	}
 
-	sanitizedHeaders, err := GetMaskedJSON(headersJson)
+	// Sanitize query parameters
+	queryJson, err := json.Marshal(queryParams)
 	if err != nil {
-		return ri, err
+		return models.RequestInfo{}, err
 	}
-	ri.Headers = sanitizedHeaders
 
-	return ri, nil
+	// Sanitize body
+	bodyJson, err := json.Marshal(bodyData)
+	if err != nil {
+		return models.RequestInfo{}, err
+	}
+
+	return models.RequestInfo{
+		Timestamp: startTime.UTC().Format("2006-01-02 15:04:05"),
+		Ip:        ip,
+		Url:       r.URL.String(),
+		Method:    r.Method,
+		Headers:   json.RawMessage(headersJson),
+		Body:      json.RawMessage(bodyJson),
+		Query:     json.RawMessage(queryJson),
+		UserAgent: r.UserAgent(),
+		RoutePath: routePath,
+		Device:    device,
+	}, nil
 }
 
 func recoverBody(r *http.Request, bodyReaderCopy io.ReadCloser) {
@@ -212,14 +201,13 @@ func maskValue(valueToMask string, key string) string {
 
 	// Handle authorization header specially
 	if strings.ToLower(key) == "authorization" {
-		parts := strings.SplitN(valueToMask, " ", 2)
-		if len(parts) == 2 {
+		parts := strings.Fields(valueToMask)
+		if len(parts) > 1 {
+			// Keep the auth type (e.g., "Bearer") but mask the token
 			return parts[0] + " " + strings.Repeat("*", 9)
 		}
-		return strings.Repeat("*", 9)
 	}
 
-	// For all other fields
 	return strings.Repeat("*", 9)
 }
 
@@ -229,38 +217,18 @@ func shouldMaskField(field string) bool {
 	return exists
 }
 
-func extractIP(remoteAddr string) string {
-	var ipAddress string
-
-	// If RemoteAddr contains both IP and port, split and return the IP
-	if strings.Contains(remoteAddr, ":") {
-		ip, _, err := net.SplitHostPort(remoteAddr)
-		if err == nil {
-			ipAddress = ip
-		} else {
-			ipAddress = remoteAddr
-		}
-	} else {
-		ipAddress = remoteAddr
+// isMobile checks if the user agent string indicates a mobile device
+func isMobile(userAgent string) bool {
+	mobilePatterns := []string{
+		"Mobile", "Android", "iPhone", "iPad", "Windows Phone",
+		"webOS", "BlackBerry", "iPod",
 	}
 
-	// Return the first valid IPv4 address
-	return SelectFirstValidIPv4(ipAddress)
-}
-
-// getMaskedQueryString returns a masked query string
-func getMaskedQueryString(query url.Values) string {
-	maskedQuery := make(url.Values)
-	for key, values := range query {
-		maskedValues := make([]string, len(values))
-		for i, value := range values {
-			if shouldMaskField(key) {
-				maskedValues[i] = strings.Repeat("*", 9)
-			} else {
-				maskedValues[i] = value
-			}
+	userAgent = strings.ToLower(userAgent)
+	for _, pattern := range mobilePatterns {
+		if strings.Contains(userAgent, strings.ToLower(pattern)) {
+			return true
 		}
-		maskedQuery[key] = maskedValues
 	}
-	return maskedQuery.Encode()
+	return false
 }

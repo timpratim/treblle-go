@@ -9,13 +9,13 @@ type RequestInfo struct {
 	Timestamp string          `json:"timestamp"`
 	Ip        string          `json:"ip"`
 	Url       string          `json:"url"`
-	RoutePath string          `json:"route_path"`
-	UserAgent string          `json:"user_agent"`
 	Method    string          `json:"method"`
-	Protocol  string          `json:"protocol"`
 	Headers   json.RawMessage `json:"headers"`
 	Body      json.RawMessage `json:"body"`
 	Query     json.RawMessage `json:"query"`
+	UserAgent string          `json:"user_agent"`
+	RoutePath string          `json:"route_path"`
+	Device    string          `json:"device"`
 }
 
 // ResponseInfo represents information about an HTTP response

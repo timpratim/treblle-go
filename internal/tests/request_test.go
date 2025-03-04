@@ -200,6 +200,107 @@ func (s *TestSuite) TestAuthorizationHeaderMasking() {
 	}
 }
 
+func (s *TestSuite) TestGetRequestInfo() {
+	testCases := map[string]struct {
+		setupRequest func() *http.Request
+		expected     models.RequestInfo
+		expectError  bool
+	}{
+		"basic-request": {
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest("GET", "http://example.com/test", nil)
+				req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+				return req
+			},
+			expected: models.RequestInfo{
+				Ip:        "192.0.2.1",
+				Method:    "GET",
+				Url:       "http://example.com/test",
+				UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+				Device:    "desktop",
+				RoutePath: "/test",
+			},
+		},
+		"mobile-request": {
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest("GET", "http://example.com/test", nil)
+				req.Header.Set("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)")
+				return req
+			},
+			expected: models.RequestInfo{
+				Ip:        "192.0.2.1",
+				Method:    "GET",
+				Url:       "http://example.com/test",
+				UserAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)",
+				Device:    "mobile",
+				RoutePath: "/test",
+			},
+		},
+		"with-x-forwarded-for": {
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest("GET", "http://example.com/test", nil)
+				req.Header.Set("X-Forwarded-For", "203.0.113.195")
+				return req
+			},
+			expected: models.RequestInfo{
+				Ip:        "203.0.113.195",
+				Method:    "GET",
+				Url:       "http://example.com/test",
+				Device:    "desktop",
+				RoutePath: "/test",
+			},
+		},
+		"with-query-params": {
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest("GET", "http://example.com/test?key=value&array=1&array=2", nil)
+				return req
+			},
+			expected: models.RequestInfo{
+				Ip:        "192.0.2.1",
+				Method:    "GET",
+				Url:       "http://example.com/test?key=value&array=1&array=2",
+				Device:    "desktop",
+				RoutePath: "/test",
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		s.Run(name, func() {
+			req := tc.setupRequest()
+			errorProvider := models.NewErrorProvider()
+			result, err := treblle.GetRequestInfo(req, time.Now(), errorProvider)
+
+			if tc.expectError {
+				s.Error(err)
+				return
+			}
+
+			s.NoError(err)
+			s.Equal(tc.expected.Ip, result.Ip)
+			s.Equal(tc.expected.Method, result.Method)
+			s.Equal(tc.expected.Url, result.Url)
+			s.Equal(tc.expected.UserAgent, result.UserAgent)
+			s.Equal(tc.expected.Device, result.Device)
+			s.Equal(tc.expected.RoutePath, result.RoutePath)
+
+			// Verify JSON fields are valid
+			if result.Headers != nil {
+				var headers map[string]interface{}
+				s.NoError(json.Unmarshal(result.Headers, &headers))
+			}
+			if result.Query != nil {
+				var query map[string]interface{}
+				s.NoError(json.Unmarshal(result.Query, &query))
+			}
+			if result.Body != nil {
+				var body map[string]interface{}
+				s.NoError(json.Unmarshal(result.Body, &body))
+			}
+		})
+	}
+}
+
 func (s *TestSuite) TestMaskHeaders() {
 	// TODO: implement test
 }
