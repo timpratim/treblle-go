@@ -2,7 +2,6 @@ package treblle
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"os/exec"
@@ -92,7 +91,7 @@ func getLocalIP() string {
 // or from a single address with port
 func SelectFirstValidIPv4(input string) string {
 	if input == "" {
-		return "127.0.0.1"  // Return localhost IP for empty input
+		return "127.0.0.1" // Return localhost IP for empty input
 	}
 
 	// Handle X-Forwarded-For style comma-separated list
@@ -130,7 +129,7 @@ func SelectFirstValidIPv4(input string) string {
 		return strings.TrimSpace(strings.Split(input, ",")[0])
 	}
 
-	return "127.0.0.1"  // Default to localhost if nothing else works
+	return "127.0.0.1" // Default to localhost if nothing else works
 }
 
 // isValidIPv4 checks if a string is a valid IPv4 address
@@ -139,24 +138,24 @@ func isValidIPv4(ip string) bool {
 	return parsedIP != nil && parsedIP.To4() != nil
 }
 
-// DetectProtocol determines the HTTP protocol version from the request
+// DetectProtocol determines the HTTP protocol (http or https) from the request
 func DetectProtocol(r *http.Request) string {
 	if r == nil {
-		return "HTTP/1.1"  // Default to HTTP/1.1 for nil requests
+		return "http"
 	}
 
-	// If Proto is set, use it
-	if r.Proto != "" {
-		return r.Proto
+	// Check X-Forwarded-Proto header first
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		return strings.ToLower(proto)
 	}
 
-	// If Proto is not set but ProtoMajor and ProtoMinor are, construct the protocol string
-	if r.ProtoMajor > 0 {
-		return fmt.Sprintf("HTTP/%d.%d", r.ProtoMajor, r.ProtoMinor)
+	// Check if the request is TLS
+	if r.TLS != nil {
+		return "https"
 	}
 
-	// Default to HTTP/1.1 if we can't determine the protocol
-	return "HTTP/1.1"
+	// Default to http
+	return "http"
 }
 
 // GetPHPVersion attempts to get the installed PHP version

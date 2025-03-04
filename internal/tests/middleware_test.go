@@ -372,8 +372,7 @@ func (s *TestSuite) TestProtocolDetection() {
 	// Wait for the protocol to be detected with a longer timeout
 	select {
 	case protocol := <-protocolChan:
-		s.Require().Equal("HTTP/1.1", protocol)
-		// log.Printf("Protocol detected: %s", protocol)
+		s.Require().Equal("http", protocol)
 	case <-time.After(5 * time.Second):
 		s.Fail("Timeout waiting for Treblle metadata")
 	}

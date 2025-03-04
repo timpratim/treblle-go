@@ -1,6 +1,7 @@
 package treblle
 
 import (
+	"crypto/tls"
 	"net/http"
 	"testing"
 
@@ -63,40 +64,42 @@ func TestDetectProtocol(t *testing.T) {
 		{
 			name:     "nil request",
 			request:  nil,
-			expected: "HTTP/1.1",
+			expected: "http",
 		},
 		{
-			name: "HTTP/1.1 request",
+			name: "X-Forwarded-Proto header set to https",
 			request: func() *http.Request {
 				req, _ := http.NewRequest("GET", "http://example.com", nil)
-				req.Proto = "HTTP/1.1"
-				req.ProtoMajor = 1
-				req.ProtoMinor = 1
+				req.Header.Set("X-Forwarded-Proto", "https")
 				return req
 			}(),
-			expected: "HTTP/1.1",
+			expected: "https",
 		},
 		{
-			name: "HTTP/2.0 request",
+			name: "X-Forwarded-Proto header set to http",
 			request: func() *http.Request {
 				req, _ := http.NewRequest("GET", "http://example.com", nil)
-				req.Proto = "HTTP/2.0"
-				req.ProtoMajor = 2
-				req.ProtoMinor = 0
+				req.Header.Set("X-Forwarded-Proto", "http")
 				return req
 			}(),
-			expected: "HTTP/2.0",
+			expected: "http",
 		},
 		{
-			name: "empty Proto but valid ProtoMajor/Minor",
+			name: "TLS request",
 			request: func() *http.Request {
-				req, _ := http.NewRequest("GET", "http://example.com", nil)
-				req.Proto = ""
-				req.ProtoMajor = 1
-				req.ProtoMinor = 0
+				req, _ := http.NewRequest("GET", "https://example.com", nil)
+				req.TLS = &tls.ConnectionState{}
 				return req
 			}(),
-			expected: "HTTP/1.0",
+			expected: "https",
+		},
+		{
+			name: "plain HTTP request",
+			request: func() *http.Request {
+				req, _ := http.NewRequest("GET", "http://example.com", nil)
+				return req
+			}(),
+			expected: "http",
 		},
 	}
 
