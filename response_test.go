@@ -35,7 +35,7 @@ func TestResponseSizeLimit(t *testing.T) {
 	errors := errorProvider.GetErrors()
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "JSON response size is over 2MB", errors[0].Message)
-	assert.Equal(t, ResponseError, errors[0].Type)
+	assert.Equal(t, ServerError, errors[0].Type)
 	assert.Equal(t, "response_size_limit", errors[0].Source)
 }
 

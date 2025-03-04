@@ -1,59 +1,42 @@
 package treblle
 
 import (
-	"errors"
+	"fmt"
 	"runtime"
+	"strings"
 	"sync"
-	"time"
 )
 
-// ErrorType represents different categories of errors
+// ErrorType represents different types of errors (matching Laravel's error types)
 type ErrorType string
 
 const (
 	UnhandledExceptionError ErrorType = "UNHANDLED_EXCEPTION"
-	RequestError           ErrorType = "REQUEST_ERROR"
-	ResponseError         ErrorType = "RESPONSE_ERROR"
-	RuntimeError          ErrorType = "RUNTIME_ERROR"
-	SystemError          ErrorType = "SYSTEM_ERROR"
-	FrameworkError       ErrorType = "FRAMEWORK_ERROR"
-	ValidationError      ErrorType = "VALIDATION_ERROR"
-	DatabaseError        ErrorType = "DATABASE_ERROR"
-	E_USER_ERROR         ErrorType = "E_USER_ERROR"
-	E_USER_WARNING       ErrorType = "E_USER_WARNING"
+	MarshalError            ErrorType = "MARSHAL_ERROR"
+	ValidationError         ErrorType = "VALIDATION_ERROR"
+	AuthenticationError     ErrorType = "AUTHENTICATION_ERROR"
+	AuthorizationError      ErrorType = "AUTHORIZATION_ERROR"
+	NotFoundError           ErrorType = "NOT_FOUND_ERROR"
+	RateLimitError          ErrorType = "RATE_LIMIT_ERROR"
+	ServerError             ErrorType = "SERVER_ERROR"
 )
 
-// ErrorSeverity represents the severity level of an error
-type ErrorSeverity string
-
-const (
-	ErrorSeverityCritical ErrorSeverity = "critical"
-	ErrorSeverityHigh     ErrorSeverity = "high"
-	ErrorSeverityMedium   ErrorSeverity = "medium"
-	ErrorSeverityLow      ErrorSeverity = "low"
-)
-
-// ErrorInfo represents a detailed error with metadata
+// ErrorInfo represents detailed error information
 type ErrorInfo struct {
-	Message    string        `json:"message"`
-	File       string        `json:"file,omitempty"`
-	Line       int           `json:"line,omitempty"`
-	Type       ErrorType     `json:"type"`
-	Source     string        `json:"source,omitempty"`
-	Stack      string        `json:"stack,omitempty"`
-	Timestamp  string        `json:"timestamp,omitempty"`
-	Severity   ErrorSeverity `json:"severity,omitempty"`
-	Context    ErrorContext  `json:"context,omitempty"`
-	Attributes map[string]interface{} `json:"attributes,omitempty"`
+	Message string    `json:"message"`
+	Type    ErrorType `json:"type"`
+	File    string    `json:"file"`
+	Line    int       `json:"line"`
+	Source  string    `json:"source"`
 }
 
-// ErrorProvider is responsible for collecting and managing errors
+// ErrorProvider manages error collection and processing
 type ErrorProvider struct {
 	mu     sync.Mutex
 	errors []ErrorInfo
 }
 
-// NewErrorProvider creates a new ErrorProvider instance
+// NewErrorProvider creates a new error provider
 func NewErrorProvider() *ErrorProvider {
 	return &ErrorProvider{
 		errors: make([]ErrorInfo, 0),
@@ -69,93 +52,51 @@ func (ep *ErrorProvider) AddError(err error, errType ErrorType, source string) {
 	ep.mu.Lock()
 	defer ep.mu.Unlock()
 
-	// Get error context with stack trace
-	context := getErrorContext(1)
-
-	// Get the caller's file and line number
 	_, file, line, ok := runtime.Caller(1)
 	if !ok {
 		file = "unknown"
 		line = 0
 	}
 
-	// Determine severity based on error type
-	severity := ep.getSeverity(errType)
+	// Clean file path (similar to Laravel's handling)
+	file = cleanFilePath(file)
 
-	errorInfo := ErrorInfo{
-		Message:   err.Error(),
-		File:      file,
-		Line:      line,
-		Type:      errType,
-		Source:    source,
-		Stack:     context.StackTrace,
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Severity:  severity,
-		Context:   context,
-		Attributes: make(map[string]interface{}),
-	}
-
-	// Add additional context if error has it
-	if ec, ok := err.(*ErrorWithContext); ok {
-		errorInfo.Context = ec.Context
-	}
-
-	// Add to batch collector if enabled, otherwise add to regular errors slice
-	if Config.batchErrorCollector != nil {
-		Config.batchErrorCollector.Add(errorInfo)
-	} else {
-		ep.errors = append(ep.errors, errorInfo)
-	}
+	ep.errors = append(ep.errors, ErrorInfo{
+		Message: err.Error(),
+		Type:    errType,
+		File:    file,
+		Line:    line,
+		Source:  source,
+	})
 }
 
-// AddCustomError adds a custom error with provided details
+// AddCustomError adds an error with custom message
 func (ep *ErrorProvider) AddCustomError(message string, errType ErrorType, source string) {
-	ep.AddError(errors.New(message), errType, source)
-}
-
-// AddErrorWithContext adds an error with additional context
-func (ep *ErrorProvider) AddErrorWithContext(err error, errType ErrorType, source string, attrs map[string]interface{}) {
-	if err == nil {
-		return
-	}
-
 	ep.mu.Lock()
 	defer ep.mu.Unlock()
 
-	// Get error context
-	context := getErrorContext(1)
-
-	// Get the caller's file and line number
 	_, file, line, ok := runtime.Caller(1)
 	if !ok {
 		file = "unknown"
 		line = 0
 	}
 
-	// Determine severity
-	severity := ep.getSeverity(errType)
+	file = cleanFilePath(file)
 
-	errorInfo := ErrorInfo{
-		Message:    err.Error(),
-		File:       file,
-		Line:       line,
-		Type:       errType,
-		Source:     source,
-		Stack:      context.StackTrace,
-		Timestamp:  time.Now().UTC().Format(time.RFC3339),
-		Severity:   severity,
-		Context:    context,
-		Attributes: attrs,
-	}
-
-	ep.errors = append(ep.errors, errorInfo)
+	ep.errors = append(ep.errors, ErrorInfo{
+		Message: message,
+		Type:    errType,
+		File:    file,
+		Line:    line,
+		Source:  source,
+	})
 }
 
 // GetErrors returns all collected errors
 func (ep *ErrorProvider) GetErrors() []ErrorInfo {
 	ep.mu.Lock()
 	defer ep.mu.Unlock()
-	
+
 	// Return a copy to prevent external modifications
 	result := make([]ErrorInfo, len(ep.errors))
 	copy(result, ep.errors)
@@ -169,18 +110,12 @@ func (ep *ErrorProvider) Clear() {
 	ep.errors = ep.errors[:0]
 }
 
-// getSeverity determines error severity based on type
-func (ep *ErrorProvider) getSeverity(errType ErrorType) ErrorSeverity {
-	switch errType {
-	case UnhandledExceptionError, SystemError, DatabaseError:
-		return ErrorSeverityCritical
-	case RuntimeError, FrameworkError:
-		return ErrorSeverityHigh
-	case RequestError, ResponseError:
-		return ErrorSeverityMedium
-	case ValidationError, E_USER_WARNING:
-		return ErrorSeverityLow
-	default:
-		return ErrorSeverityMedium
+// cleanFilePath cleans the file path similar to Laravel's handling
+func cleanFilePath(path string) string {
+	// Get the last two path components
+	parts := strings.Split(path, "/")
+	if len(parts) > 2 {
+		return fmt.Sprintf(".../%s/%s", parts[len(parts)-2], parts[len(parts)-1])
 	}
+	return path
 }

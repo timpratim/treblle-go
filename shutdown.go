@@ -2,6 +2,7 @@ package treblle
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 )
@@ -45,26 +46,24 @@ func Shutdown(r *http.Request, w http.ResponseWriter, responseBody []byte, optio
 		startTime = time.Now().Add(-time.Millisecond) // Subtract a millisecond to ensure duration is positive
 		
 		// Get request info
-		var err error
-		requestInfo, err = getRequestInfo(r, startTime, errorProvider)
-		if err != nil {
-			errorProvider.AddError(err, RequestError, "shutdown_request_processing")
+		var errReqInfo error
+		requestInfo, errReqInfo = getRequestInfo(r, startTime, errorProvider)
+		if errReqInfo != nil && !errors.Is(errReqInfo, ErrNotJson) {
+			errorProvider.AddError(errReqInfo, ValidationError, "shutdown_request_processing")
 		}
 	}
 	
 	// Process headers for response info
 	headers := make(map[string]interface{})
-	for k, v := range w.Header() {
-		if len(v) == 1 {
-			headers[k] = v[0]
-		} else {
-			headers[k] = v
+	for key, values := range w.Header() {
+		if len(values) > 0 {
+			headers[key] = values[0]
 		}
 	}
 	
-	headersJson, err := json.Marshal(headers)
+	headersJson, err := json.Marshal(maskMap(headers))
 	if err != nil {
-		errorProvider.AddError(err, ResponseError, "header_encoding")
+		errorProvider.AddError(err, MarshalError, "header_encoding")
 	}
 	
 	// Create response info

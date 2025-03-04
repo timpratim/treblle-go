@@ -22,15 +22,15 @@ func TestBatchErrorCollector(t *testing.T) {
 	// Create test errors
 	testErrors := []ErrorInfo{
 		{
-			Message:  "Test error 1",
-			Type:    RequestError,
+			Message: "Test error 1",
+			Type:    ValidationError,
 			Source:  "test",
 			Line:    42,
 			File:    "test.go",
 		},
 		{
-			Message:  "Test error 2",
-			Type:    ResponseError,
+			Message: "Test error 2",
+			Type:    ServerError,
 			Source:  "test",
 			Line:    43,
 			File:    "test.go",

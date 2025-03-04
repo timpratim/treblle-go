@@ -38,7 +38,7 @@ func TestShutdown(t *testing.T) {
 
 	// Test with custom options
 	errorProvider := NewErrorProvider()
-	errorProvider.AddCustomError("Test error", RuntimeError, "test")
+	errorProvider.AddCustomError("Test error", ValidationError, "test")
 	
 	options := &ShutdownOptions{
 		AdditionalFieldsToMask: []string{"password", "token"},
@@ -71,7 +71,6 @@ func TestShutdown(t *testing.T) {
 	respHeadersJson, _ := json.Marshal(respHeaders)
 	
 	requestInfo := RequestInfo{
-		Timestamp: time.Now().Format(time.RFC3339),
 		Ip:        "127.0.0.1",
 		Url:       "https://example.com/api/test",
 		UserAgent: "Test User Agent",
@@ -104,19 +103,15 @@ func TestGracefulShutdown(t *testing.T) {
 	// Add some errors to the batch collector
 	if Config.batchErrorCollector != nil {
 		Config.batchErrorCollector.Add(ErrorInfo{
-			Message:   "Test error 1",
-			Type:      RuntimeError,
-			Source:    "test",
-			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			Severity:  ErrorSeverityMedium,
+			Message: "Test error 1",
+			Type:    ValidationError,
+			Source:  "test",
 		})
 		
 		Config.batchErrorCollector.Add(ErrorInfo{
-			Message:   "Test error 2",
-			Type:      ValidationError,
-			Source:    "test",
-			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			Severity:  ErrorSeverityLow,
+			Message: "Test error 2",
+			Type:    ValidationError,
+			Source:  "test",
 		})
 	}
 	

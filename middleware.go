@@ -44,7 +44,7 @@ func Middleware(next http.Handler) http.Handler {
 		// Get request info before processing
 		requestInfo, errReqInfo := getRequestInfo(r, startTime, errorProvider)
 		if errReqInfo != nil && !errors.Is(errReqInfo, ErrNotJson) {
-			errorProvider.AddError(errReqInfo, RequestError, "request_processing")
+			errorProvider.AddError(errReqInfo, ValidationError, "request_processing")
 		}
 		
 		// First check if a route path was manually set
@@ -81,7 +81,7 @@ func Middleware(next http.Handler) http.Handler {
 		// Write response body
 		_, err := w.Write(rec.Body.Bytes())
 		if err != nil {
-			errorProvider.AddError(err, ResponseError, "response_writing")
+			errorProvider.AddError(err, ServerError, "response_writing")
 			return
 		}
 
@@ -89,41 +89,41 @@ func Middleware(next http.Handler) http.Handler {
 		// 1. The request was valid JSON (or had no body)
 		// OR
 		// 2. The response is JSON (regardless of status code)
-		if !errors.Is(errReqInfo, ErrNotJson) || rec.Header().Get("Content-Type") == "application/json" {
-			responseInfo := getResponseInfo(rec, startTime, errorProvider)
-			
-			// Add all collected errors to the response
-			responseInfo.Errors = errorProvider.GetErrors()
+		// OR
+		// 3. The response is not JSON (we'll still track it)
+		responseInfo := getResponseInfo(rec, startTime, errorProvider)
+		
+		// Add all collected errors to the response
+		responseInfo.Errors = errorProvider.GetErrors()
 
-			if Config.AsyncProcessingEnabled {
-				// Process asynchronously with controlled concurrency
-				GetAsyncProcessor().Process(requestInfo, responseInfo, errorProvider)
-			} else {
-				// Create metadata
-				ti := MetaData{
-					ApiKey:    Config.APIKey,
-					ProjectID: Config.ProjectID,
-					Version:   Config.SDKVersion,
-					Sdk:       Config.SDKName,
-					Data: DataInfo{
-						Server:   serverInfo, // Use the updated serverInfo with correct protocol
-						Language: Config.languageInfo,
-						Request:  requestInfo,
-						Response: responseInfo,
-					},
-				}
-
-				// Don't block execution while sending data to Treblle
-				go func(ti MetaData) {
-					defer func() {
-						if err := recover(); err != nil {
-							fmt.Printf("Panic recovered in goroutine: %v\n", err)
-						// Silently recover from panic
-						}
-					}()
-					sendToTreblle(ti)
-				}(ti)
+		if Config.AsyncProcessingEnabled {
+			// Process asynchronously with controlled concurrency
+			GetAsyncProcessor().Process(requestInfo, responseInfo, errorProvider)
+		} else {
+			// Create metadata
+			ti := MetaData{
+				ApiKey:    Config.APIKey,
+				ProjectID: Config.ProjectID,
+				Version:   Config.SDKVersion,
+				Sdk:       Config.SDKName,
+				Data: DataInfo{
+					Server:   serverInfo, // Use the updated serverInfo with correct protocol
+					Language: Config.languageInfo,
+					Request:  requestInfo,
+					Response: responseInfo,
+				},
 			}
+
+			// Don't block execution while sending data to Treblle
+			go func(ti MetaData) {
+				defer func() {
+					if err := recover(); err != nil {
+						fmt.Printf("Panic recovered in goroutine: %v\n", err)
+					// Silently recover from panic
+					}
+				}()
+				sendToTreblle(ti)
+			}(ti)
 		}
 	})
 }

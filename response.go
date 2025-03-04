@@ -2,9 +2,8 @@ package treblle
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"net/http/httptest"
-	"strings"
 	"time"
 )
 
@@ -20,116 +19,108 @@ type ResponseInfo struct {
 	Errors   []ErrorInfo     `json:"errors"`
 }
 
-// Extract information from the response recorder
+// getResponseInfo extracts information from the response matching Laravel SDK structure
 func getResponseInfo(response *httptest.ResponseRecorder, startTime time.Time, errorProvider *ErrorProvider) ResponseInfo {
-
-	re := ResponseInfo{
-		Code:     response.Code,
-		Size:     len(response.Body.Bytes()),
-		LoadTime: float64(time.Since(startTime).Microseconds()),
-		Errors:   []ErrorInfo{},
+	// Process headers (similar to Laravel's collect()->first())
+	headers := make(map[string]interface{})
+	for key, values := range response.Header() {
+		if len(values) == 0 {
+			continue
+		}
+		
+		// For multiple values, keep them as an array
+		if len(values) > 1 {
+			// If the field should be masked, mask each value
+			if shouldMaskField(key) {
+				maskedValues := make([]interface{}, len(values))
+				for i := range values {
+					maskedValues[i] = maskValue(values[i], key)
+				}
+				headers[key] = maskedValues
+			} else {
+				headers[key] = values
+			}
+		} else {
+			// Single value
+			if shouldMaskField(key) {
+				headers[key] = maskValue(values[0], key)
+			} else {
+				headers[key] = values[0]
+			}
+		}
+	}
+	
+	headerJSON, err := json.Marshal(headers)
+	if err != nil {
+		headerJSON = json.RawMessage("{}")
+		errorProvider.AddCustomError(
+			fmt.Sprintf("failed to marshal response headers: %v", err),
+			MarshalError,
+			"getResponseInfo",
+		)
 	}
 
-	// Handle response body
-	if bodyBytes := response.Body.Bytes(); len(bodyBytes) > 0 {
-		// Check if response body size exceeds 2MB
-		if len(bodyBytes) > maxResponseSize {
+	// Get response body
+	body := response.Body.Bytes()
+	var bodyJSON json.RawMessage
+	var size int
+	if len(body) > 0 {
+		if len(body) > maxResponseSize {
 			// Replace with empty JSON object
-			re.Body = json.RawMessage("{}")
+			bodyJSON = json.RawMessage("{}")
 			// Set size to 0 as we're not sending the actual body
-			re.Size = 0
-			// Add an error log for exceeding response size
+			size = 0
 			errorProvider.AddCustomError(
 				"JSON response size is over 2MB",
-				ResponseError,
+				ServerError,
 				"response_size_limit",
 			)
 		} else {
-			// Try to mask if it's JSON
-			sanitizedBody, err := getMaskedJSON(bodyBytes)
-			if err != nil {
-				// For non-JSON responses, just store the raw body as a JSON string
-				if errors.Is(err, ErrNotJson) {
-					// Create a JSON-encoded string without extra quotes
-					jsonBytes, err := json.Marshal(string(bodyBytes))
-					if err != nil {
-						errorProvider.AddError(err, ResponseError, "body_encoding")
-					} else {
-						re.Body = json.RawMessage(jsonBytes)
-					}
+			// Check if response is JSON
+			contentType := response.Header().Get("Content-Type")
+			if contentType == "application/json" {
+				maskedBody, err := getMaskedJSON(body)
+				if err != nil {
+					bodyJSON = json.RawMessage("{}")
+					errorProvider.AddCustomError(
+						fmt.Sprintf("failed to mask response body: %v", err),
+						MarshalError,
+						"getResponseInfo",
+					)
 				} else {
-					errorProvider.AddCustomError(err.Error(), ResponseError, "body_masking")
-					jsonBytes, err := json.Marshal(string(bodyBytes))
-					if err != nil {
-						errorProvider.AddError(err, ResponseError, "body_encoding")
-					} else {
-						re.Body = json.RawMessage(jsonBytes)
-					}
+					bodyJSON = maskedBody
 				}
 			} else {
-				re.Body = sanitizedBody
-			}
-		}
-	}
-
-	// Handle response headers
-	headers := make(map[string]interface{})
-	for k, v := range response.Header() {
-		if len(v) == 1 {
-			if shouldMaskHeader(k) {
-				if strings.ToLower(k) == "authorization" {
-					parts := strings.SplitN(v[0], " ", 2)
-					if len(parts) == 2 {
-						headers[k] = parts[0] + " " + strings.Repeat("*", 9)
-					} else {
-						headers[k] = strings.Repeat("*", 9)
-					}
+				// For non-JSON responses, wrap the raw string in JSON quotes
+				bodyStr := string(body)
+				bodyBytes, err := json.Marshal(bodyStr)
+				if err != nil {
+					bodyJSON = json.RawMessage("{}")
+					errorProvider.AddCustomError(
+						fmt.Sprintf("failed to marshal non-JSON response: %v", err),
+						MarshalError,
+						"getResponseInfo",
+					)
 				} else {
-					headers[k] = strings.Repeat("*", 9)
+					bodyJSON = bodyBytes
 				}
-			} else {
-				headers[k] = v[0]
 			}
-		} else {
-			if shouldMaskHeader(k) {
-				masked := make([]string, len(v))
-				for i := range v {
-					masked[i] = strings.Repeat("*", 9)
-				}
-				headers[k] = masked
-			} else {
-				headers[k] = v
-			}
+			size = len(body)
 		}
+	} else {
+		bodyJSON = json.RawMessage("{}")
+		size = 0
 	}
 
-	headersJson, err := json.Marshal(headers)
-	if err != nil {
-		errorProvider.AddError(err, ResponseError, "header_encoding")
-		return re
+	// Calculate load time in milliseconds (matching Laravel's precision)
+	loadTime := float64(time.Since(startTime).Microseconds()) / 1000.0
+
+	return ResponseInfo{
+		Headers:  headerJSON,
+		Code:     response.Code,
+		Size:     size,
+		LoadTime: loadTime,
+		Body:     bodyJSON,
+		Errors:   errorProvider.GetErrors(),
 	}
-	re.Headers = json.RawMessage(headersJson)
-
-	return re
-}
-
-// Helper function to check if a header should be masked
-func shouldMaskHeader(headerName string) bool {
-	// Convert header name to lowercase for consistent matching
-	headerName = strings.ToLower(headerName)
-
-	// Check direct match
-	if _, exists := Config.FieldsMap[headerName]; exists {
-		return true
-	}
-
-	// Check with common prefixes
-	prefixes := []string{"x-", "x_"}
-	for _, prefix := range prefixes {
-		if _, exists := Config.FieldsMap[prefix+headerName]; exists {
-			return true
-		}
-	}
-
-	return false
 }

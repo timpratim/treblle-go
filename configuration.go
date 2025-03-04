@@ -174,12 +174,6 @@ func generateFieldsToMask(defaultFields, additionalFields []string) map[string]b
 	return fieldsToMask
 }
 
-// shouldMaskField checks if a field should be masked based on configuration
-func shouldMaskField(field string) bool {
-	_, exists := Config.FieldsMap[strings.ToLower(field)]
-	return exists
-}
-
 // Utility function to get env variable or return default
 func getEnvOrDefault(envKey, defaultValue string) string {
 	if value := os.Getenv(envKey); value != "" {

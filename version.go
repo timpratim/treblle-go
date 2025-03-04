@@ -1,7 +1,7 @@
 package treblle
 
-// SDK Versioning (Matching Laravel)
+// SDK Versioning
 const (
 	SDKName    = "go"
-	SDKVersion = "1.0.0" // Change this when updating versions
+	SDKVersion = "2.0.0"
 )
