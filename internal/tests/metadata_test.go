@@ -110,3 +110,57 @@ func TestDetectProtocol(t *testing.T) {
 		})
 	}
 }
+
+func TestGetFullProtocol(t *testing.T) {
+	testCases := []struct {
+		name     string
+		request  *http.Request
+		expected string
+	}{
+		{
+			name:     "nil request",
+			request:  nil,
+			expected: "HTTP/1.1",
+		},
+		{
+			name: "HTTP/1.1 request",
+			request: func() *http.Request {
+				req, _ := http.NewRequest("GET", "http://example.com", nil)
+				req.Proto = "HTTP/1.1"
+				req.ProtoMajor = 1
+				req.ProtoMinor = 1
+				return req
+			}(),
+			expected: "HTTP/1.1",
+		},
+		{
+			name: "HTTP/2.0 request",
+			request: func() *http.Request {
+				req, _ := http.NewRequest("GET", "http://example.com", nil)
+				req.Proto = "HTTP/2.0"
+				req.ProtoMajor = 2
+				req.ProtoMinor = 0
+				return req
+			}(),
+			expected: "HTTP/2.0",
+		},
+		{
+			name: "empty Proto but valid ProtoMajor/Minor",
+			request: func() *http.Request {
+				req, _ := http.NewRequest("GET", "http://example.com", nil)
+				req.Proto = ""
+				req.ProtoMajor = 1
+				req.ProtoMinor = 0
+				return req
+			}(),
+			expected: "HTTP/1.0",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := treblle.GetFullProtocol(tc.request)
+			assert.Equal(t, tc.expected, result, "GetFullProtocol returned unexpected result")
+		})
+	}
+}

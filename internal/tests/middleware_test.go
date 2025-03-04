@@ -38,21 +38,21 @@ func (s *TestSuite) SetupTest() {
 	s.testServer = httptest.NewServer(s.router)
 	s.treblleMockMux = http.NewServeMux()
 	s.treblleMockServer = httptest.NewServer(s.treblleMockMux)
-	
+
 	// Set environment to something that won't be ignored
 	os.Setenv("GO_ENV", "integration")
-	
+
 	// Configure with the mock URL and disable async processing
 	mockURL := s.treblleMockServer.URL
 	internal.Configure(internal.Configuration{
-		ApiKey:                "test-api-key",
-		ProjectID:             "test-project-id",
-		DefaultFieldsToMask:   []string{"password", "api_key", "credit_card", "authorization"},
-		Endpoint:              mockURL,
-		AsyncProcessingEnabled: false, // Disable async processing for tests
-		IgnoredEnvironments:   []string{}, // Make sure no environments are ignored
+		ApiKey:                 "test-api-key",
+		ProjectID:              "test-project-id",
+		DefaultFieldsToMask:    []string{"password", "api_key", "credit_card", "authorization"},
+		Endpoint:               mockURL,
+		AsyncProcessingEnabled: false,      // Disable async processing for tests
+		IgnoredEnvironments:    []string{}, // Make sure no environments are ignored
 	})
-	
+
 	// Directly set the models.Config.Endpoint to ensure it uses the mock server
 	models.Config.Endpoint = mockURL
 	models.Config.ApiKey = "test-api-key"
@@ -197,11 +197,11 @@ func (s *TestSuite) TestMiddleware() {
 
 	// Process test cases in a specific order to ensure "happy-path" is first
 	testOrder := []string{"happy-path", "invalid-request-json", "non-json-response"}
-	
+
 	for _, tn := range testOrder {
 		tc := testCases[tn]
 		s.SetupTest()
-		
+
 		// Use a channel to track if the mock server was called
 		treblleCalled := make(chan bool, 1)
 
@@ -214,14 +214,14 @@ func (s *TestSuite) TestMiddleware() {
 			// log.Printf("Mock server received request to: %s", r.URL.String())
 			// log.Printf("Test case: %s", tn)
 			// log.Printf("Request method: %s, headers: %v", r.Method, r.Header)
-			
+
 			// Read the request body for logging
 			bodyBytes, _ := io.ReadAll(r.Body)
 			// log.Printf("Request body: %s", string(bodyBytes))
-			
+
 			// Create a new reader from the bytes for the JSON decoder
 			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-			
+
 			var treblleMetadata models.MetaData
 			decoder := json.NewDecoder(r.Body)
 			err := decoder.Decode(&treblleMetadata)
@@ -268,19 +268,19 @@ func (s *TestSuite) TestMiddleware() {
 		if tc.requestHeaderKey != "" {
 			req.Header.Set(tc.requestHeaderKey, tc.requestHeaderValue)
 		}
-		
+
 		resp, err := client.Do(req)
 		if err != nil {
 			s.Fail("Failed to execute request", err)
 		}
 		defer resp.Body.Close()
-		
+
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			s.Fail("Failed to read response body", err)
 		}
 		body := string(bodyBytes)
-		
+
 		s.Require().Equal(tc.status, resp.StatusCode, tn)
 		s.Require().Equal(tc.responseJson, body, tn)
 		if tc.respHeaderKey != "" {
@@ -303,14 +303,14 @@ func (s *TestSuite) TestMiddleware() {
 
 func (s *TestSuite) TestProtocolDetection() {
 	s.SetupTest()
-	
+
 	// Set environment to ensure it's not ignored
 	os.Setenv("GO_ENV", "integration")
 	defer os.Unsetenv("GO_ENV")
-	
+
 	// Create a channel to receive the detected protocol
 	protocolChan := make(chan string, 1)
-	
+
 	// Setup the mock Treblle server to capture the protocol
 	// No need to reconfigure here, it's already set up in SetupTest
 	// log.Printf("Models Config Endpoint: %s", models.Config.Endpoint)
@@ -320,14 +320,14 @@ func (s *TestSuite) TestProtocolDetection() {
 		// log.Printf("Protocol detection mock server received request")
 		// log.Printf("Request method: %s, headers: %v", r.Method, r.Header)
 		// log.Printf("Request URL: %s", r.URL.String())
-		
+
 		// Read the request body for logging
 		bodyBytes, _ := io.ReadAll(r.Body)
 		// log.Printf("Request body: %s", string(bodyBytes))
-		
+
 		// Create a new reader from the bytes for the JSON decoder
 		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-		
+
 		var treblleMetadata models.MetaData
 		decoder := json.NewDecoder(r.Body)
 		err := decoder.Decode(&treblleMetadata)
@@ -336,14 +336,14 @@ func (s *TestSuite) TestProtocolDetection() {
 			s.Fail("Failed to decode Treblle metadata", err)
 			return
 		}
-		
+
 		// log.Printf("Received protocol: %s", treblleMetadata.Data.Server.Protocol)
 		// Send the protocol to the channel
 		protocolChan <- treblleMetadata.Data.Server.Protocol
 		// log.Printf("Sent protocol to channel")
 		w.WriteHeader(http.StatusOK)
 	})
-	
+
 	// Create a test request with HTTP/1.1
 	s.router.Get("/protocol-test", func(w http.ResponseWriter, r *http.Request) {
 		// log.Printf("Protocol test handler called")
@@ -351,7 +351,7 @@ func (s *TestSuite) TestProtocolDetection() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
-	
+
 	// Make the request with a valid JSON body
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", s.testServer.URL+"/protocol-test", strings.NewReader(`{"test":"data"}`))
@@ -359,16 +359,16 @@ func (s *TestSuite) TestProtocolDetection() {
 		s.Fail("Failed to create request", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// log.Printf("Sending request to %s", s.testServer.URL+"/protocol-test")
 	resp, err := client.Do(req)
 	if err != nil {
 		s.Fail("Failed to execute request", err)
 	}
 	defer resp.Body.Close()
-	
+
 	s.Require().Equal(http.StatusOK, resp.StatusCode)
-	
+
 	// Wait for the protocol to be detected with a longer timeout
 	select {
 	case protocol := <-protocolChan:
@@ -376,7 +376,7 @@ func (s *TestSuite) TestProtocolDetection() {
 	case <-time.After(5 * time.Second):
 		s.Fail("Timeout waiting for Treblle metadata")
 	}
-	
+
 	s.TearDownTest()
 }
 

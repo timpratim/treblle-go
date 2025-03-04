@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"strconv"
 	"time"
 
 	"github.com/timpratim/treblle-go/internal"
@@ -65,7 +66,7 @@ func GetServerInfo(r *http.Request) internal.ServerInfo {
 		Timezone: time.Local.String(),
 		Software: serverSoftware,
 		Os:       osInfo,
-		Protocol: DetectProtocol(r),
+		Protocol: GetFullProtocol(r),
 	}
 }
 
@@ -138,13 +139,13 @@ func isValidIPv4(ip string) bool {
 	return parsedIP != nil && parsedIP.To4() != nil
 }
 
-// DetectProtocol determines the HTTP protocol (http or https) from the request
+// DetectProtocol determines if the request is using http or https
 func DetectProtocol(r *http.Request) string {
 	if r == nil {
 		return "http"
 	}
 
-	// Check X-Forwarded-Proto header first
+	// Check X-Forwarded-Proto header first (common for proxies)
 	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
 		return strings.ToLower(proto)
 	}
@@ -156,6 +157,29 @@ func DetectProtocol(r *http.Request) string {
 
 	// Default to http
 	return "http"
+}
+
+// GetFullProtocol determines the full HTTP protocol (HTTP/1.1, HTTP/2, etc.) from the request
+func GetFullProtocol(r *http.Request) string {
+	if r == nil {
+		return "HTTP/1.1"
+	}
+
+	// If Proto is empty but we have valid ProtoMajor/Minor, construct it
+	if r.Proto == "" && r.ProtoMajor > 0 {
+		return "HTTP/" + strings.Join([]string{
+			strconv.Itoa(r.ProtoMajor),
+			strconv.Itoa(r.ProtoMinor),
+		}, ".")
+	}
+
+	// Use the request's Proto field directly
+	if r.Proto != "" {
+		return r.Proto
+	}
+
+	// Default to HTTP/1.1
+	return "HTTP/1.1"
 }
 
 // GetPHPVersion attempts to get the installed PHP version

@@ -35,7 +35,7 @@ func GetRequestInfo(r *http.Request, startTime time.Time, errorProvider *models.
 		}
 	}
 
-	// Detect protocol
+	// Detect protocol for URL construction
 	protocol := DetectProtocol(r)
 
 	rawPath := r.URL.EscapedPath()
@@ -63,7 +63,7 @@ func GetRequestInfo(r *http.Request, startTime time.Time, errorProvider *models.
 		RoutePath: r.URL.Path, // Initially set to the actual path. Will be overridden by route pattern if available.
 		UserAgent: r.UserAgent(),
 		Method:    r.Method,
-		Protocol:  protocol,
+		Protocol:  r.Proto, // Use the actual protocol version from the request
 	}
 
 	// Mask query parameters
