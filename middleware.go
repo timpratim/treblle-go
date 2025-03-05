@@ -45,32 +45,11 @@ func Middleware(next http.Handler) http.Handler {
 			errorProvider.AddError(errReqInfo, ValidationError, "request_processing")
 		}
 
-		// // First check if a route path was manually set
-		// if pattern, ok := r.Context().Value(routePathKey).(string); ok && pattern != "" {
-		// 	fmt.Printf("normalizeRoutePath using routePathKey: %s\n", pattern)
-		// 	requestInfo.RoutePath = normalizeRoutePath(pattern)
-		// } else {
-		// 	// Try to extract route pattern from gorilla/mux if available
-		// 	if route := mux.CurrentRoute(r); route != nil {
-		// 		if pattern, err := route.GetPathTemplate(); err == nil && pattern != "" {
-		// 			fmt.Printf("normalizeRoutePath using gorilla/mux: %s\n", pattern)
-		// 			requestInfo.RoutePath = normalizeRoutePath(pattern)
-		// 		}
-		// 	}
-
-		// 	// If we still don't have a route path, use the URL path as fallback
-		// 	if requestInfo.RoutePath == "" {
-		// 		fmt.Printf("normalizeRoutePath using URL path: %s\n", r.URL.Path)
-		// 		requestInfo.RoutePath = normalizeRoutePath(r.URL.Path)
-		// 	}
-		// }
-
 		// Log the route path for debugging
 		if Config.Debug {
 			fmt.Printf("==== DEBUG: TREBLLE ROUTE PATH ====\n")
 			fmt.Printf("Original URL Path: %s\n", r.URL)
 			fmt.Printf("Normalized Route Path: %s\n", requestInfo.RoutePath)
-			// full url
 			fmt.Printf("Full URL: %s\n", requestInfo.Url)
 			fmt.Printf("================================\n")
 		}
@@ -125,7 +104,6 @@ func Middleware(next http.Handler) http.Handler {
 				ProjectID: Config.ProjectID,
 				Version:   Config.SDKVersion,
 				Sdk:       Config.SDKName,
-				//Url:       requestInfo.Url, // Use the normalized route path for endpoint grouping
 				Data: DataInfo{
 					Server:   serverInfo,
 					Language: Config.languageInfo,

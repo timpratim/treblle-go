@@ -15,7 +15,6 @@ type RequestInfo struct {
 	Timestamp string `json:"timestamp"`
 	Ip        string `json:"ip"`
 	Url       string `json:"url"` // This will now contain the normalized route path
-	//FullUrl   string          `json:"full_url"`   // Add a field to store the actual full URL
 	RoutePath string          `json:"route_path"` // Keep the route path for compatibility
 	UserAgent string          `json:"user_agent"`
 	Method    string          `json:"method"`
@@ -130,16 +129,11 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 		}
 	}
 
-	// Format the URL like Laravel does but with our route path
-	// This creates a URL that looks like a real URL but with route parameters
-	// Reuse scheme variable already declared above
-	//endpointUrl := fmt.Sprintf("%s://%s%s", scheme, r.Host, routePath)
 
 	return RequestInfo{
 		Timestamp: timestamp,
 		Ip:        ip,
 		Url:       fullURL, // Use endpoint URL with normalized path
-		//FullUrl:   fullURL,   // Keep the full URL for reference
 		RoutePath: routePath, // Keep route path for compatibility
 		UserAgent: r.UserAgent(),
 		Method:    r.Method,
