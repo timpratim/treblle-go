@@ -24,11 +24,6 @@ func getTreblleBaseUrl() string {
 		return Config.Endpoint
 	}
 
-	// For debug mode
-	if Config.Debug {
-		return "https://debug.treblle.com/"
-	}
-
 	// Default Treblle endpoints
 	treblleBaseUrls := []string{
 		"https://rocknrolla.treblle.com",
@@ -46,7 +41,7 @@ func sendToTreblle(treblleInfo MetaData) {
 	// Use the context-aware version with a default timeout
 	ctx, cancel := context.WithTimeout(context.Background(), timeoutDuration)
 	defer cancel()
-	
+
 	sendToTreblleWithContext(ctx, treblleInfo)
 }
 
@@ -65,7 +60,7 @@ func sendToTreblleWithContext(ctx context.Context, treblleInfo MetaData) error {
 		fmt.Println("\n==== DEBUG: TREBLLE PAYLOAD ====")
 		fmt.Println(string(prettyJson))
 		fmt.Println("=================================")
-		
+
 		// Highlight the critical fields used for endpoint grouping
 		fmt.Println("\n🔍 Important fields for endpoint grouping:")
 		fmt.Printf("Request 'url' field: %s\n", treblleInfo.Data.Request.Url)
