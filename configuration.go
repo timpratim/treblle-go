@@ -25,6 +25,7 @@ type Configuration struct {
 	MaxConcurrentProcessing int           // Maximum number of concurrent async operations (default: 10)
 	AsyncShutdownTimeout    time.Duration // Timeout for async shutdown (default: 5s)
 	IgnoredEnvironments     []string      // Environments where Treblle does not track requests
+	Debug                   bool          // Enable debug mode to see what's being sent to Treblle
 }
 
 // internalConfiguration is used for communication with Treblle API and contains optimizations
@@ -58,6 +59,9 @@ func Configure(config Configuration) {
 	if config.Endpoint != "" {
 		Config.Endpoint = config.Endpoint
 	}
+	
+	// Set debug mode
+	Config.Debug = config.Debug
 
 	// Initialize server and language info
 	Config.serverInfo = GetServerInfo(nil) // Pass nil as request, protocol will be updated in middleware

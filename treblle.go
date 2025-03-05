@@ -59,6 +59,21 @@ func sendToTreblleWithContext(ctx context.Context, treblleInfo MetaData) error {
 		return err
 	}
 
+	// Print debug info if debug mode is enabled
+	if Config.Debug {
+		prettyJson, _ := json.MarshalIndent(treblleInfo, "", "  ")
+		fmt.Println("\n==== DEBUG: TREBLLE PAYLOAD ====")
+		fmt.Println(string(prettyJson))
+		fmt.Println("=================================")
+		
+		// Highlight the critical fields used for endpoint grouping
+		fmt.Println("\n🔍 Important fields for endpoint grouping:")
+		fmt.Printf("Request 'url' field: %s\n", treblleInfo.Data.Request.Url)
+		fmt.Printf("Request 'route_path' field: %s\n", treblleInfo.Data.Request.RoutePath)
+		fmt.Printf("Request 'full_url' field: %s\n", treblleInfo.Data.Request.FullUrl)
+		fmt.Println("=================================")
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseUrl, bytes.NewBuffer(bytesRepresentation))
 	if err != nil {
 		return err

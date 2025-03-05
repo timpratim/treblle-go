@@ -109,7 +109,7 @@ func Middleware(next http.Handler) http.Handler {
 				ProjectID: Config.ProjectID,
 				Version:   Config.SDKVersion,
 				Sdk:       Config.SDKName,
-				Url:       requestInfo.RoutePath, // Add the normalized route path for endpoint grouping
+				Url:       requestInfo.Url, // Use the normalized URL from requestInfo (critical for endpoint grouping)
 				Data: DataInfo{
 					Server:   serverInfo, // Use the updated serverInfo with correct protocol
 					Language: Config.languageInfo,
