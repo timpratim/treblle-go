@@ -72,7 +72,7 @@ func sendToTreblleWithContext(ctx context.Context, treblleInfo MetaData) error {
 		fmt.Println("\n🔍 Important fields for endpoint grouping:")
 		fmt.Printf("Request 'url' field: %s\n", treblleInfo.Data.Request.Url)
 		fmt.Printf("Request 'route_path' field: %s\n", treblleInfo.Data.Request.RoutePath)
-		fmt.Printf("Request 'full_url' field: %s\n", treblleInfo.Data.Request.FullUrl)
+		//fmt.Printf("Request 'full_url' field: %s\n", treblleInfo.Data.Request.FullUrl)
 		fmt.Println("=================================")
 	}
 
@@ -96,7 +96,7 @@ func sendToTreblleWithContext(ctx context.Context, treblleInfo MetaData) error {
 	if Config.Debug {
 		fmt.Printf("\n==== DEBUG: TREBLLE RESPONSE ====\n")
 		fmt.Printf("Status: %s\n", resp.Status)
-		
+
 		// Read and log response body
 		respBody := make([]byte, 1024)
 		n, _ := resp.Body.Read(respBody)

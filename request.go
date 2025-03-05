@@ -12,10 +12,10 @@ import (
 )
 
 type RequestInfo struct {
-	Timestamp string          `json:"timestamp"`
-	Ip        string          `json:"ip"`
-	Url       string          `json:"url"`        // This will now contain the normalized route path
-	FullUrl   string          `json:"full_url"`   // Add a field to store the actual full URL
+	Timestamp string `json:"timestamp"`
+	Ip        string `json:"ip"`
+	Url       string `json:"url"` // This will now contain the normalized route path
+	//FullUrl   string          `json:"full_url"`   // Add a field to store the actual full URL
 	RoutePath string          `json:"route_path"` // Keep the route path for compatibility
 	UserAgent string          `json:"user_agent"`
 	Method    string          `json:"method"`
@@ -138,8 +138,8 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 	return RequestInfo{
 		Timestamp: timestamp,
 		Ip:        ip,
-		Url:       routePath, // Use endpoint URL with normalized path
-		FullUrl:   fullURL,   // Keep the full URL for reference
+		Url:       fullURL, // Use endpoint URL with normalized path
+		//FullUrl:   fullURL,   // Keep the full URL for reference
 		RoutePath: routePath, // Keep route path for compatibility
 		UserAgent: r.UserAgent(),
 		Method:    r.Method,
