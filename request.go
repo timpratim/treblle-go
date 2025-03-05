@@ -161,7 +161,7 @@ func normalizeRoutePath(path string) string {
 		path = parts[1]
 	}
 
-	// Ensure path starts with /
+	// Ensure path starts with a slash
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
@@ -172,14 +172,15 @@ func normalizeRoutePath(path string) string {
 		segments := strings.Split(path, "/")
 		for i, segment := range segments {
 			if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
-				// Extract just the parameter name before the colon
-				if colonIdx := strings.Index(segment, ":"); colonIdx != -1 {
-					paramName := segment[1:colonIdx]
-					segments[i] = "{" + paramName + "}"
+				// Extract just the parameter name before any constraints
+				paramName := segment[1:len(segment)-1] // Remove { and }
+				if colonIdx := strings.Index(paramName, ":"); colonIdx != -1 {
+					paramName = paramName[:colonIdx] // Take everything before the colon
 				}
+				segments[i] = "{" + paramName + "}"
 			}
 		}
-		return strings.Join(segments, "/")
+		path = strings.Join(segments, "/")
 	} else if strings.Contains(path, ":") {
 		// Convert :param format to {param} format
 		segments := strings.Split(path, "/")
@@ -189,25 +190,30 @@ func normalizeRoutePath(path string) string {
 				segments[i] = "{" + paramName + "}"
 			}
 		}
-		return strings.Join(segments, "/")
-	}
-	
-	// Convert simple numeric segments and UUIDs to parameter placeholders
-	segments := strings.Split(path, "/")
-	for i, segment := range segments {
-		if segment == "" {
-			continue
+		path = strings.Join(segments, "/")
+	} else {
+		// Convert simple numeric segments and UUIDs to parameter placeholders
+		segments := strings.Split(path, "/")
+		for i, segment := range segments {
+			if segment == "" {
+				continue
+			}
+			// Check if segment is a numeric ID
+			if _, err := fmt.Sscanf(segment, "%d", new(int)); err == nil {
+				segments[i] = "{id}"
+			} else if len(segment) >= 20 && isUUID(segment) {
+				segments[i] = "{uuid}"
+			}
 		}
-		// Check if segment is a numeric ID
-		if _, err := fmt.Sscanf(segment, "%d", new(int)); err == nil {
-			segments[i] = "{id}"
-		} else if len(segment) >= 20 && isUUID(segment) {
-			// Looks like a UUID
-			segments[i] = "{uuid}"
-		}
+		path = strings.Join(segments, "/")
 	}
-	
-	return strings.Join(segments, "/")
+
+	// Clean up any double slashes
+	for strings.Contains(path, "//") {
+		path = strings.ReplaceAll(path, "//", "/")
+	}
+
+	return path
 }
 
 // isUUID checks if a string looks like a UUID
