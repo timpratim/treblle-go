@@ -74,6 +74,9 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 	if routePath == "" {
 		routePath = r.URL.Path
 	}
+	
+	// Normalize the route path to ensure it works with Treblle's endpoint grouping
+	routePath = normalizeRoutePath(routePath)
 
 	// Process headers (similar to Laravel's collect()->first())
 	headers := make(map[string]interface{})
@@ -141,4 +144,33 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 
 func recoverBody(r *http.Request, bodyReaderCopy io.ReadCloser) {
 	r.Body = bodyReaderCopy
+}
+
+// normalizeRoutePath converts dynamic route segments to a consistent format
+// This helps Treblle to properly group requests under the same endpoint
+func normalizeRoutePath(path string) string {
+	// Already has route parameters in the expected format
+	if strings.Contains(path, ":") || strings.Contains(path, "{") {
+		return path
+	}
+	
+	// Convert simple numeric segments to parameter placeholders
+	segments := strings.Split(path, "/")
+	for i, segment := range segments {
+		// Check if segment is a numeric ID
+		if _, err := fmt.Sscanf(segment, "%d", new(int)); err == nil {
+			segments[i] = ":id"
+		} else if len(segment) >= 20 && isUUID(segment) {
+			// Looks like a UUID
+			segments[i] = ":uuid"
+		}
+	}
+	
+	return strings.Join(segments, "/")
+}
+
+// isUUID checks if a string looks like a UUID
+func isUUID(s string) bool {
+	// Simple UUID check - could be improved for specific formats
+	return strings.Count(s, "-") >= 3 && len(s) >= 32
 }

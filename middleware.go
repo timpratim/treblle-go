@@ -58,6 +58,9 @@ func Middleware(next http.Handler) http.Handler {
 				}
 			}
 		}
+		
+		// Normalize the route path to ensure consistent endpoint grouping in Treblle
+		requestInfo.RoutePath = normalizeRoutePath(requestInfo.RoutePath)
 
 		// Store request info in context if async processing is enabled
 		if Config.AsyncProcessingEnabled {
