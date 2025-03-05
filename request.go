@@ -161,10 +161,25 @@ func normalizeRoutePath(path string) string {
 		path = parts[1]
 	}
 
-	// Already has route parameters in the expected format
+	// Ensure path starts with /
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	// Handle gorilla/mux style parameters with regex constraints
+	// Convert {id:[0-9]+} to {id}
 	if strings.Contains(path, "{") && strings.Contains(path, "}") {
-		// Keep the {param} format as is
-		return path
+		segments := strings.Split(path, "/")
+		for i, segment := range segments {
+			if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
+				// Extract just the parameter name before the colon
+				if colonIdx := strings.Index(segment, ":"); colonIdx != -1 {
+					paramName := segment[1:colonIdx]
+					segments[i] = "{" + paramName + "}"
+				}
+			}
+		}
+		return strings.Join(segments, "/")
 	} else if strings.Contains(path, ":") {
 		// Convert :param format to {param} format
 		segments := strings.Split(path, "/")

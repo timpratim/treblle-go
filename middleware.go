@@ -57,6 +57,19 @@ func Middleware(next http.Handler) http.Handler {
 					requestInfo.RoutePath = normalizeRoutePath(pattern)
 				}
 			}
+			
+			// If we still don't have a route path, use the URL path as fallback
+			if requestInfo.RoutePath == "" {
+				requestInfo.RoutePath = normalizeRoutePath(r.URL.Path)
+			}
+		}
+
+		// Log the route path for debugging
+		if Config.Debug {
+			fmt.Printf("==== DEBUG: TREBLLE ROUTE PATH ====\n")
+			fmt.Printf("Original URL Path: %s\n", r.URL.Path)
+			fmt.Printf("Normalized Route Path: %s\n", requestInfo.RoutePath)
+			fmt.Printf("================================\n")
 		}
 
 		// Ensure URL also uses the normalized path for consistent endpoint grouping
