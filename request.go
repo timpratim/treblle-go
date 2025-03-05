@@ -133,12 +133,12 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 	// Format the URL like Laravel does but with our route path
 	// This creates a URL that looks like a real URL but with route parameters
 	// Reuse scheme variable already declared above
-	endpointUrl := fmt.Sprintf("%s://%s%s", scheme, r.Host, routePath)
+	//endpointUrl := fmt.Sprintf("%s://%s%s", scheme, r.Host, routePath)
 	
 	return RequestInfo{
 		Timestamp: timestamp,
 		Ip:        ip,
-		Url:       endpointUrl, // Use endpoint URL with normalized path
+		Url:       routePath, // Use endpoint URL with normalized path
 		FullUrl:   fullURL,     // Keep the full URL for reference
 		RoutePath: routePath,   // Keep route path for compatibility
 		UserAgent: r.UserAgent(),
