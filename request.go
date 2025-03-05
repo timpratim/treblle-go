@@ -75,7 +75,7 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 	if routePath == "" {
 		routePath = r.URL.Path
 	}
-	
+
 	// Normalize the route path to ensure it works with Treblle's endpoint grouping
 	routePath = normalizeRoutePath(routePath)
 
@@ -134,13 +134,13 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 	// This creates a URL that looks like a real URL but with route parameters
 	// Reuse scheme variable already declared above
 	//endpointUrl := fmt.Sprintf("%s://%s%s", scheme, r.Host, routePath)
-	
+
 	return RequestInfo{
 		Timestamp: timestamp,
 		Ip:        ip,
 		Url:       routePath, // Use endpoint URL with normalized path
-		FullUrl:   fullURL,     // Keep the full URL for reference
-		RoutePath: routePath,   // Keep route path for compatibility
+		FullUrl:   fullURL,   // Keep the full URL for reference
+		RoutePath: routePath, // Keep route path for compatibility
 		UserAgent: r.UserAgent(),
 		Method:    r.Method,
 		Headers:   headerJSON,
@@ -156,6 +156,7 @@ func recoverBody(r *http.Request, bodyReaderCopy io.ReadCloser) {
 // normalizeRoutePath converts dynamic route segments to a consistent format
 // This helps Treblle to properly group requests under the same endpoint
 func normalizeRoutePath(path string) string {
+	fmt.Printf("normalizeRoutePath: %s\n", path)
 	// Remove any HTTP method prefix if present (e.g., "GET /api/users" -> "/api/users")
 	if parts := strings.SplitN(path, " ", 2); len(parts) == 2 {
 		path = parts[1]
@@ -173,9 +174,10 @@ func normalizeRoutePath(path string) string {
 		for i, segment := range segments {
 			if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
 				// Extract just the parameter name before any constraints
-				paramName := segment[1:len(segment)-1] // Remove { and }
+				paramName := segment[1 : len(segment)-1] // Remove { and }
 				if colonIdx := strings.Index(paramName, ":"); colonIdx != -1 {
 					paramName = paramName[:colonIdx] // Take everything before the colon
+					fmt.Printf("paramName: %s\n", paramName)
 				}
 				segments[i] = "{" + paramName + "}"
 			}
