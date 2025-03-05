@@ -17,6 +17,7 @@ type MetaData struct {
 	Version   string   `json:"version"`
 	Sdk       string   `json:"sdk"`
 	Data      DataInfo `json:"data"`
+	Url       string   `json:"url,omitempty"` // Add the normalized endpoint URL for grouping
 }
 
 type DataInfo struct {

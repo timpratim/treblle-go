@@ -96,6 +96,7 @@ func (ap *AsyncProcessor) Process(requestInfo RequestInfo, responseInfo Response
 			ProjectID: Config.ProjectID,
 			Version:   Config.SDKVersion,
 			Sdk:       Config.SDKName,
+			Url:       requestInfo.RoutePath, // Add the normalized route path for endpoint grouping
 			Data: DataInfo{
 				Server:   Config.serverInfo,
 				Language: Config.languageInfo,
