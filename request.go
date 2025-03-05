@@ -156,20 +156,39 @@ func recoverBody(r *http.Request, bodyReaderCopy io.ReadCloser) {
 // normalizeRoutePath converts dynamic route segments to a consistent format
 // This helps Treblle to properly group requests under the same endpoint
 func normalizeRoutePath(path string) string {
+	// Remove any HTTP method prefix if present (e.g., "GET /api/users" -> "/api/users")
+	if parts := strings.SplitN(path, " ", 2); len(parts) == 2 {
+		path = parts[1]
+	}
+
 	// Already has route parameters in the expected format
-	if strings.Contains(path, ":") || strings.Contains(path, "{") {
+	if strings.Contains(path, "{") && strings.Contains(path, "}") {
+		// Keep the {param} format as is
 		return path
+	} else if strings.Contains(path, ":") {
+		// Convert :param format to {param} format
+		segments := strings.Split(path, "/")
+		for i, segment := range segments {
+			if strings.HasPrefix(segment, ":") {
+				paramName := strings.TrimPrefix(segment, ":")
+				segments[i] = "{" + paramName + "}"
+			}
+		}
+		return strings.Join(segments, "/")
 	}
 	
-	// Convert simple numeric segments to parameter placeholders
+	// Convert simple numeric segments and UUIDs to parameter placeholders
 	segments := strings.Split(path, "/")
 	for i, segment := range segments {
+		if segment == "" {
+			continue
+		}
 		// Check if segment is a numeric ID
 		if _, err := fmt.Sscanf(segment, "%d", new(int)); err == nil {
-			segments[i] = ":id"
+			segments[i] = "{id}"
 		} else if len(segment) >= 20 && isUUID(segment) {
 			// Looks like a UUID
-			segments[i] = ":uuid"
+			segments[i] = "{uuid}"
 		}
 	}
 	
@@ -178,6 +197,10 @@ func normalizeRoutePath(path string) string {
 
 // isUUID checks if a string looks like a UUID
 func isUUID(s string) bool {
-	// Simple UUID check - could be improved for specific formats
-	return strings.Count(s, "-") >= 3 && len(s) >= 32
+	// More robust UUID check
+	if len(s) != 36 {
+		return false
+	}
+	parts := strings.Split(s, "-")
+	return len(parts) == 5 && len(parts[0]) == 8 && len(parts[1]) == 4 && len(parts[2]) == 4 && len(parts[3]) == 4 && len(parts[4]) == 12
 }
