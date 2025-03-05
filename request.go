@@ -14,8 +14,9 @@ import (
 type RequestInfo struct {
 	Timestamp string          `json:"timestamp"`
 	Ip        string          `json:"ip"`
-	Url       string          `json:"url"`
-	RoutePath string          `json:"route_path"`
+	Url       string          `json:"url"`        // This will now contain the normalized route path
+	FullUrl   string          `json:"full_url"`   // Add a field to store the actual full URL
+	RoutePath string          `json:"route_path"` // Keep the route path for compatibility
 	UserAgent string          `json:"user_agent"`
 	Method    string          `json:"method"`
 	Headers   json.RawMessage `json:"headers"`
@@ -129,10 +130,13 @@ func getRequestInfo(r *http.Request, startTime time.Time, errorProvider *ErrorPr
 		}
 	}
 
+	// Store both the full URL (for logging/debugging) and use the normalized 
+	// route path as the main URL that Treblle will use for endpoint grouping
 	return RequestInfo{
 		Timestamp: timestamp,
 		Ip:        ip,
-		Url:       fullURL,
+		Url:       routePath, // Use the normalized route path as the main URL for endpoint grouping
+		FullUrl:   fullURL,   // Keep the full URL for reference
 		RoutePath: routePath,
 		UserAgent: r.UserAgent(),
 		Method:    r.Method,
