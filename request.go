@@ -156,7 +156,7 @@ func recoverBody(r *http.Request, bodyReaderCopy io.ReadCloser) {
 // normalizeRoutePath converts dynamic route segments to a consistent format
 // This helps Treblle to properly group requests under the same endpoint
 func normalizeRoutePath(path string) string {
-	fmt.Printf("normalizeRoutePath: %s\n", path)
+
 	// Remove any HTTP method prefix if present (e.g., "GET /api/users" -> "/api/users")
 	if parts := strings.SplitN(path, " ", 2); len(parts) == 2 {
 		path = parts[1]

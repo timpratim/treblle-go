@@ -49,17 +49,20 @@ func Middleware(next http.Handler) http.Handler {
 
 		// First check if a route path was manually set
 		if pattern, ok := r.Context().Value(routePathKey).(string); ok && pattern != "" {
+			fmt.Printf("normalizeRoutePath using routePathKey: %s\n", pattern)
 			requestInfo.RoutePath = normalizeRoutePath(pattern)
 		} else {
 			// Try to extract route pattern from gorilla/mux if available
 			if route := mux.CurrentRoute(r); route != nil {
 				if pattern, err := route.GetPathTemplate(); err == nil && pattern != "" {
+					fmt.Printf("normalizeRoutePath using gorilla/mux: %s\n", pattern)
 					requestInfo.RoutePath = normalizeRoutePath(pattern)
 				}
 			}
-			
+
 			// If we still don't have a route path, use the URL path as fallback
 			if requestInfo.RoutePath == "" {
+				fmt.Printf("normalizeRoutePath using URL path: %s\n", r.URL.Path)
 				requestInfo.RoutePath = normalizeRoutePath(r.URL.Path)
 			}
 		}
