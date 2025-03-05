@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"time"
-
-	"github.com/gorilla/mux"
 )
 
 func Middleware(next http.Handler) http.Handler {
@@ -47,25 +45,25 @@ func Middleware(next http.Handler) http.Handler {
 			errorProvider.AddError(errReqInfo, ValidationError, "request_processing")
 		}
 
-		// First check if a route path was manually set
-		if pattern, ok := r.Context().Value(routePathKey).(string); ok && pattern != "" {
-			fmt.Printf("normalizeRoutePath using routePathKey: %s\n", pattern)
-			requestInfo.RoutePath = normalizeRoutePath(pattern)
-		} else {
-			// Try to extract route pattern from gorilla/mux if available
-			if route := mux.CurrentRoute(r); route != nil {
-				if pattern, err := route.GetPathTemplate(); err == nil && pattern != "" {
-					fmt.Printf("normalizeRoutePath using gorilla/mux: %s\n", pattern)
-					requestInfo.RoutePath = normalizeRoutePath(pattern)
-				}
-			}
+		// // First check if a route path was manually set
+		// if pattern, ok := r.Context().Value(routePathKey).(string); ok && pattern != "" {
+		// 	fmt.Printf("normalizeRoutePath using routePathKey: %s\n", pattern)
+		// 	requestInfo.RoutePath = normalizeRoutePath(pattern)
+		// } else {
+		// 	// Try to extract route pattern from gorilla/mux if available
+		// 	if route := mux.CurrentRoute(r); route != nil {
+		// 		if pattern, err := route.GetPathTemplate(); err == nil && pattern != "" {
+		// 			fmt.Printf("normalizeRoutePath using gorilla/mux: %s\n", pattern)
+		// 			requestInfo.RoutePath = normalizeRoutePath(pattern)
+		// 		}
+		// 	}
 
-			// If we still don't have a route path, use the URL path as fallback
-			if requestInfo.RoutePath == "" {
-				fmt.Printf("normalizeRoutePath using URL path: %s\n", r.URL.Path)
-				requestInfo.RoutePath = normalizeRoutePath(r.URL.Path)
-			}
-		}
+		// 	// If we still don't have a route path, use the URL path as fallback
+		// 	if requestInfo.RoutePath == "" {
+		// 		fmt.Printf("normalizeRoutePath using URL path: %s\n", r.URL.Path)
+		// 		requestInfo.RoutePath = normalizeRoutePath(r.URL.Path)
+		// 	}
+		// }
 
 		// Log the route path for debugging
 		if Config.Debug {
@@ -76,7 +74,7 @@ func Middleware(next http.Handler) http.Handler {
 		}
 
 		// Ensure URL also uses the normalized path for consistent endpoint grouping
-		requestInfo.Url = requestInfo.RoutePath
+		//requestInfo.Url = requestInfo.RoutePath
 
 		// Store request info in context if async processing is enabled
 		if Config.AsyncProcessingEnabled {
