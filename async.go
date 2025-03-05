@@ -21,10 +21,10 @@ const (
 
 // AsyncProcessor manages asynchronous processing with controlled concurrency
 type AsyncProcessor struct {
-	sem     *semaphore.Weighted
-	wg      sync.WaitGroup
-	ctx     context.Context
-	cancel  context.CancelFunc
+	sem    *semaphore.Weighted
+	wg     sync.WaitGroup
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // RequestTracker stores and retrieves request data using context
@@ -34,7 +34,7 @@ var (
 	// Global async processor instance
 	asyncProcessor     *AsyncProcessor
 	asyncProcessorOnce sync.Once
-	
+
 	// Global request tracker instance
 	requestTracker     *RequestTracker
 	requestTrackerOnce sync.Once
@@ -73,15 +73,15 @@ func GetRequestTracker() *RequestTracker {
 // Process handles the asynchronous processing of Treblle data
 func (ap *AsyncProcessor) Process(requestInfo RequestInfo, responseInfo ResponseInfo, errorProvider *ErrorProvider) {
 	ap.wg.Add(1)
-	
+
 	// Process asynchronously
 	go func() {
 		defer ap.wg.Done()
-		
+
 		// Create a context with timeout for acquiring the semaphore
 		acquireCtx, cancel := context.WithTimeout(ap.ctx, 100*time.Millisecond)
 		defer cancel()
-		
+
 		// Try to acquire the semaphore
 		if err := ap.sem.Acquire(acquireCtx, 1); err != nil {
 			// If we can't acquire the semaphore in time, just drop the request
@@ -89,14 +89,14 @@ func (ap *AsyncProcessor) Process(requestInfo RequestInfo, responseInfo Response
 			return
 		}
 		defer ap.sem.Release(1)
-		
+
 		// Create metadata
 		ti := MetaData{
 			ApiKey:    Config.APIKey,
 			ProjectID: Config.ProjectID,
 			Version:   Config.SDKVersion,
 			Sdk:       Config.SDKName,
-			Url:       requestInfo.RoutePath, // Use the normalized URL from requestInfo (critical for endpoint grouping)
+			//	Url:       requestInfo.RoutePath, // Use the normalized URL from requestInfo (critical for endpoint grouping)
 			Data: DataInfo{
 				Server:   Config.serverInfo,
 				Language: Config.languageInfo,
@@ -104,11 +104,11 @@ func (ap *AsyncProcessor) Process(requestInfo RequestInfo, responseInfo Response
 				Response: responseInfo,
 			},
 		}
-		
+
 		// Use a context with timeout for the API call
 		sendCtx, sendCancel := context.WithTimeout(ap.ctx, 2*time.Second)
 		defer sendCancel()
-		
+
 		// Send to Treblle with context
 		sendToTreblleWithContext(sendCtx, ti)
 	}()
@@ -121,7 +121,7 @@ func (ap *AsyncProcessor) Wait(timeout time.Duration) bool {
 		defer close(c)
 		ap.wg.Wait()
 	}()
-	
+
 	select {
 	case <-c:
 		return true // All processing completed
@@ -134,7 +134,7 @@ func (ap *AsyncProcessor) Wait(timeout time.Duration) bool {
 func (ap *AsyncProcessor) Shutdown(timeout time.Duration) {
 	// Signal cancellation to all operations
 	ap.cancel()
-	
+
 	// Wait for ongoing operations to complete
 	ap.Wait(timeout)
 }

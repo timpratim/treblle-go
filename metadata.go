@@ -17,7 +17,7 @@ type MetaData struct {
 	Version   string   `json:"version"`
 	Sdk       string   `json:"sdk"`
 	Data      DataInfo `json:"data"`
-	Url       string   `json:"url"` // The normalized endpoint URL for grouping (REQUIRED for endpoints dashboard)
+	//Url       string   `json:"url"` // The normalized endpoint URL for grouping (REQUIRED for endpoints dashboard)
 }
 
 type DataInfo struct {
@@ -120,29 +120,29 @@ func SelectFirstValidIPv4(ipList string) string {
 	if ipList == "" {
 		return "127.0.0.1"
 	}
-	
+
 	// Split by comma if multiple IPs are provided
 	ips := strings.Split(ipList, ",")
-	
+
 	// Check each IP
 	for _, ipRaw := range ips {
 		// Clean up the IP (remove spaces, etc.)
 		ip := strings.TrimSpace(ipRaw)
-		
+
 		// Parse the IP to validate it
 		parsedIP := net.ParseIP(ip)
-		
+
 		// Check if it's a valid IPv4 address
 		if parsedIP != nil && parsedIP.To4() != nil {
 			return ip
 		}
 	}
-	
+
 	// If no valid IPv4 found, return the first one anyway or localhost
 	if len(ips) > 0 {
 		return strings.TrimSpace(ips[0])
 	}
-	
+
 	return "127.0.0.1"
 }
 
@@ -152,17 +152,17 @@ func DetectProtocol(r *http.Request) string {
 	if r == nil {
 		return "HTTP/1.1" // Default to HTTP/1.1 if no request is provided
 	}
-	
+
 	// The Proto field contains the protocol version (e.g., "HTTP/1.1", "HTTP/2.0")
 	if r.Proto != "" {
 		return r.Proto
 	}
-	
+
 	// Fallback to ProtoMajor and ProtoMinor if Proto is not available
 	if r.ProtoMajor > 0 {
 		return fmt.Sprintf("HTTP/%d.%d", r.ProtoMajor, r.ProtoMinor)
 	}
-	
+
 	// Default fallback
 	return "HTTP/1.1"
 }

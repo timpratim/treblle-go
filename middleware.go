@@ -68,8 +68,10 @@ func Middleware(next http.Handler) http.Handler {
 		// Log the route path for debugging
 		if Config.Debug {
 			fmt.Printf("==== DEBUG: TREBLLE ROUTE PATH ====\n")
-			fmt.Printf("Original URL Path: %s\n", r.URL.Path)
+			fmt.Printf("Original URL Path: %s\n", r.URL)
 			fmt.Printf("Normalized Route Path: %s\n", requestInfo.RoutePath)
+			// full url
+			fmt.Printf("Full URL: %s\n", requestInfo.Url)
 			fmt.Printf("================================\n")
 		}
 
@@ -123,7 +125,7 @@ func Middleware(next http.Handler) http.Handler {
 				ProjectID: Config.ProjectID,
 				Version:   Config.SDKVersion,
 				Sdk:       Config.SDKName,
-				Url:       requestInfo.RoutePath, // Use the normalized route path for endpoint grouping
+				//Url:       requestInfo.Url, // Use the normalized route path for endpoint grouping
 				Data: DataInfo{
 					Server:   serverInfo,
 					Language: Config.languageInfo,
