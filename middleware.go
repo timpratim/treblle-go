@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"time"
-	
+
 	"github.com/gorilla/mux"
 )
 
@@ -36,7 +36,7 @@ func Middleware(next http.Handler) http.Handler {
 
 		// Get the request tracker
 		tracker := GetRequestTracker()
-		
+
 		// Store start time in request context
 		startTime := time.Now()
 		r = tracker.StoreStartTime(r)
@@ -46,21 +46,21 @@ func Middleware(next http.Handler) http.Handler {
 		if errReqInfo != nil && !errors.Is(errReqInfo, ErrNotJson) {
 			errorProvider.AddError(errReqInfo, ValidationError, "request_processing")
 		}
-		
+
 		// First check if a route path was manually set
 		if pattern, ok := r.Context().Value(routePathKey).(string); ok && pattern != "" {
-			requestInfo.RoutePath = pattern
+			requestInfo.RoutePath = normalizeRoutePath(pattern)
 		} else {
 			// Try to extract route pattern from gorilla/mux if available
 			if route := mux.CurrentRoute(r); route != nil {
 				if pattern, err := route.GetPathTemplate(); err == nil && pattern != "" {
-					requestInfo.RoutePath = pattern
+					requestInfo.RoutePath = normalizeRoutePath(pattern)
 				}
 			}
 		}
-		
-		// Normalize the route path to ensure consistent endpoint grouping in Treblle
-		requestInfo.RoutePath = normalizeRoutePath(requestInfo.RoutePath)
+
+		// Ensure URL also uses the normalized path for consistent endpoint grouping
+		requestInfo.Url = requestInfo.RoutePath
 
 		// Store request info in context if async processing is enabled
 		if Config.AsyncProcessingEnabled {
@@ -95,7 +95,7 @@ func Middleware(next http.Handler) http.Handler {
 		// OR
 		// 3. The response is not JSON (we'll still track it)
 		responseInfo := getResponseInfo(rec, startTime, errorProvider)
-		
+
 		// Add all collected errors to the response
 		responseInfo.Errors = errorProvider.GetErrors()
 
@@ -123,7 +123,7 @@ func Middleware(next http.Handler) http.Handler {
 				defer func() {
 					if err := recover(); err != nil {
 						fmt.Printf("Panic recovered in goroutine: %v\n", err)
-					// Silently recover from panic
+						// Silently recover from panic
 					}
 				}()
 				sendToTreblle(ti)
