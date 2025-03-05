@@ -49,6 +49,13 @@ func sendToTreblle(treblleInfo MetaData) {
 func sendToTreblleWithContext(ctx context.Context, treblleInfo MetaData) error {
 	baseUrl := getTreblleBaseUrl()
 
+	// Print debug info if debug mode is enabled
+	if Config.Debug {
+		fmt.Printf("\n==== DEBUG: TREBLLE ENDPOINT ====\n")
+		fmt.Printf("Sending to: %s\n", baseUrl)
+		fmt.Printf("================================\n")
+	}
+
 	bytesRepresentation, err := json.Marshal(treblleInfo)
 	if err != nil {
 		return err
@@ -85,6 +92,19 @@ func sendToTreblleWithContext(ctx context.Context, treblleInfo MetaData) error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if Config.Debug {
+		fmt.Printf("\n==== DEBUG: TREBLLE RESPONSE ====\n")
+		fmt.Printf("Status: %s\n", resp.Status)
+		
+		// Read and log response body
+		respBody := make([]byte, 1024)
+		n, _ := resp.Body.Read(respBody)
+		if n > 0 {
+			fmt.Printf("Response: %s\n", respBody[:n])
+		}
+		fmt.Printf("================================\n")
+	}
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("treblle api returned error status: %s", resp.Status)
