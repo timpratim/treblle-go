@@ -19,7 +19,7 @@ func TestAsyncProcessor_Process(t *testing.T) {
 		MaxConcurrentProcessing: 2,
 		AsyncShutdownTimeout:    1 * time.Second,
 		SDKName:                 "treblle-go-test",
-		SDKVersion:              "0.0.1-test",
+		SDKVersion:              0.1,
 	}
 
 	// Create a mock request and response
@@ -119,7 +119,7 @@ func TestAsyncShutdown(t *testing.T) {
 		MaxConcurrentProcessing: 2,
 		AsyncShutdownTimeout:    500 * time.Millisecond,
 		SDKName:                 "treblle-go-test",
-		SDKVersion:              "0.0.1-test",
+		SDKVersion:              0.1,
 	}
 	
 	// Create a new async processor
